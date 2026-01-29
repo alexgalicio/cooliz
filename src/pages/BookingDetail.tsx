@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { deleteBooking } from "../services/storage";
-import { AddPaymentModal } from "../components/booking/AddPaymentModal";
+import { AddPaymentModal } from "../components/payment/AddPaymentModal";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { BookingDetails } from "../types/booking";
