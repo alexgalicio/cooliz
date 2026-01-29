@@ -1,44 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-   --color-background:  oklch(1 0 0);
-   --color-foreground:  oklch(0.141 0.005 285.823);
-   --color-card:  oklch(1 0 0);
-   --color-card-foreground:  oklch(0.141 0.005 285.823);
-   --color-popover:  oklch(1 0 0);
-   --color-popover-foreground:  oklch(0.141 0.005 285.823);
-   --color-primary:  oklch(0.646 0.222 41.116);
-   --color-primary-foreground:  oklch(0.98 0.016 73.684);
-   --color-secondary:  oklch(0.967 0.001 286.375);
-   --color-secondary-foreground:  oklch(0.21 0.006 285.885);
-   --color-muted:  oklch(0.967 0.001 286.375);
-   --color-muted-foreground:  oklch(0.552 0.016 285.938);
-   --color-accent:  oklch(0.967 0.001 286.375);
-   --color-accent-foreground:  oklch(0.21 0.006 285.885);
-   --color-destructive:  oklch(0.577 0.245 27.325);
-   --color-border:  oklch(0.92 0.004 286.32);
-   --color-input:  oklch(0.92 0.004 286.32);
-   --color-ring:  oklch(0.75 0.183 55.934);
+   --color-background: oklch(1 0 0);
+   --color-foreground: oklch(0.141 0.005 285.823);
+   --color-primary: oklch(0.646 0.222 41.116);
+   --color-primary-foreground: oklch(0.98 0.016 73.684);
+   --color-muted: oklch(0.967 0.001 286.375);
+   --color-muted-foreground: oklch(0.552 0.016 285.938);
+   --color-accent: oklch(0.967 0.001 286.375);
+   --color-accent-foreground: oklch(0.21 0.006 285.885);
+   --color-destructive: oklch(0.577 0.245 27.325);
+   --color-border: oklch(0.92 0.004 286.32);
+   --color-input: oklch(0.92 0.004 286.32);
+   --color-ring: oklch(0.75 0.183 55.934);
 
-   --color-sidebar:  oklch(0.985 0 0);
-   --color-sidebar-foreground:  oklch(0.141 0.005 285.823);
-   --color-sidebar-primary:  oklch(0.646 0.222 41.116);
-   --color-sidebar-primary-foreground:  oklch(0.98 0.016 73.684);
-   --color-sidebar-accent:  oklch(0.967 0.001 286.375);
-   --color-sidebar-accent-foreground:  oklch(0.21 0.006 285.885);
-   --color-sidebar-border:  oklch(0.92 0.004 286.32);
-   --color-sidebar-ring:  oklch(0.75 0.183 55.934);
-
-   /* dashboard stats card */
-   --color-blue: oklch(0.5465 0.2455 262.87);
-   --color-green: oklch(0.632 0.185972 147.3695);
-   --color-red: oklch(0.6471 0.2173 36.85);
-   --color-violet: oklch(0.5576 0.2877 302.3);
+   --color-sidebar: oklch(0.985 0 0);
+   --color-sidebar-foreground: oklch(0.141 0.005 285.823);
+   --color-sidebar-primary: oklch(0.646 0.222 41.116);
+   --color-sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+   --color-sidebar-accent: oklch(0.967 0.001 286.375);
+   --color-sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+   --color-sidebar-border: oklch(0.92 0.004 286.32);
 }
 
 @layer components {
    input {
-      @apply w-full border border-input bg-background px-4 py-2 rounded-lg;
+      @apply w-full rounded-lg border border-input bg-background px-4 py-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]
+   }
+
+   select {
+      @apply h-10 text-sm rounded-md border border-input bg-background px-3 py-2 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50
    }
 
    button {
@@ -46,10 +37,30 @@
    }
 
    .btn-primary {
-      @apply px-4 py-2 rounded-md text-sm bg-primary text-primary-foreground;
+      @apply px-4 py-2 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90;
    }
 
    .btn-outline {
-      @apply px-4 py-2 rounded-md text-sm bg-background border border-border;
+      @apply px-4 py-2 rounded-md text-sm bg-background border border-border hover:bg-accent hover:text-accent-foreground;
+   }
+
+   .btn-destructive {
+      @apply px-4 py-2 rounded-md text-sm bg-destructive text-white shadow-xs hover:bg-destructive/90;
+   }
+
+   .badge {
+      @apply rounded-md border px-2 py-0.5 text-xs font-medium capitalize;
+   }
+
+   .badge-paid {
+      @apply bg-green-600/10 text-green-600;
+   }
+
+   .badge-partial {
+      @apply bg-amber-600/10 text-amber-600;
+   }
+
+   .required-field {
+      @apply text-destructive;
    }
 }
