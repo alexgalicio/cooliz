@@ -92,13 +92,13 @@ export function AddPaymentModal({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Remaining Balance:</span>
+              <span className="text-muted-foreground">Paid Amount:</span>
               <span className="font-medium text-foreground">
-                {formatCurrency(item.remainingAmount)}
+                {formatCurrency(item.booking.totalAmount - item.remainingAmount)}
               </span>
             </div>
             <div className="flex justify-between pt-2 border-t border-border">
-              <span className="text-muted-foreground">Payment Amount:</span>
+              <span className="text-muted-foreground">Remaining Balance:</span>
               <span className="font-semibold text-foreground">
                 {formatCurrency(item.remainingAmount)}
               </span>
@@ -114,7 +114,7 @@ export function AddPaymentModal({
                 onClick={handlePayRemaining}
                 className="btn-primary w-full"
               >
-                Pay Remaining
+                Pay Remaining Balance
               </button>
             </div>
           ) : (
