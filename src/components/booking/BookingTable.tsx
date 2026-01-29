@@ -52,7 +52,7 @@ export function BookingTable({ bookings }: BookingTableProps) {
                   {formatDate(item.booking.endDate)}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  {formatTime(item.booking.startDate)} – {formatTime(item.booking.endDate)}
+                  {formatTime(item.booking.startDate)} - {formatTime(item.booking.endDate)}
                 </td>
                 <td className="px-4 py-3 text-foreground">
                   {formatCurrency(item.booking.totalAmount)}
