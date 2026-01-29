@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useState, useEffect } from "react";
-import { Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { getAllBookings } from "../services/storage";
 import { BookingTable } from "../components/booking/BookingTable";
 import { BookingDetails } from "../types/booking";
@@ -13,6 +13,8 @@ function Bookings() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     let cancelled = false; // prevent state update if the component unmounts
@@ -31,7 +33,6 @@ function Bookings() {
     };
   }, []);
 
-
   const filtered = bookings.filter((item) => {
     const q = search.toLowerCase();
     const matchesSearch =
@@ -43,6 +44,17 @@ function Bookings() {
 
     return matchesSearch && matchesStatus;
   });
+
+  // reset to first page when filters/search change
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  const totalItems = filtered.length;
+  const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / pageSize);
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
   return (
     <MainLayout>
@@ -86,7 +98,43 @@ function Bookings() {
             Loading bookings…
           </div>
         ) : (
-          <BookingTable bookings={filtered} />
+          <div className="space-y-4">
+            <BookingTable bookings={paginated} />
+
+            {/* pagination */}
+            {totalItems > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
+                <span>
+                  Showing{" "}
+                  {startIndex + 1}-
+                  {Math.min(startIndex + pageSize, totalItems)} of {totalItems} bookings
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-outline px-2 py-1"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-outline px-2 py-1"
+                    disabled={currentPage >= totalPages}
+                    onClick={() =>
+                      setPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </MainLayout>
