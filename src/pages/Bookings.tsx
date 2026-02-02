@@ -90,6 +90,7 @@ function Bookings() {
             <option value="all">All Status</option>
             <option value="partial">Partial</option>
             <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
 
