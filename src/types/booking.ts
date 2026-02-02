@@ -12,6 +12,7 @@ export interface Booking {
   startDate: string;
   endDate: string;
   totalAmount: number;
+  status?: "active" | "cancelled";
 }
 
 export interface Payment {
