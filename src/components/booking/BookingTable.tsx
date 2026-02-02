@@ -62,10 +62,13 @@ export function BookingTable({ bookings }: BookingTableProps) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`badge ${status === "paid"
-                      ? "badge-paid"
-                      : "badge-partial"
-                      }`}
+                    className={`badge ${
+                      status === "paid"
+                        ? "badge-paid"
+                        : status === "cancelled"
+                        ? "badge-cancelled"
+                        : "badge-partial"
+                    }`}
                   >
                     {status}
                   </span>
