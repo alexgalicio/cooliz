@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   start_date TEXT,
   end_date TEXT,
   total_amount REAL,
+  status TEXT DEFAULT 'active', -- active | cancelled
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
