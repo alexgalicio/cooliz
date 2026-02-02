@@ -1,8 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
-import { deleteBooking } from "../services/storage";
+import { cancelBooking } from "../services/storage";
 import { AddPaymentModal } from "../components/payment/AddPaymentModal";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Ban, ArrowLeft, Plus } from "lucide-react";
 import { useState } from "react";
 import { BookingDetails } from "../types/booking";
 import { formatCurrency, formatDate, getStatus } from "../utils/formatter";
@@ -32,17 +32,33 @@ function BookingDetail() {
     );
   }
 
-  // function to delete booking
-  async function handleDelete() {
+  // function to cancel booking
+  async function handleCancel() {
     if (!item?.booking.id) return;
 
-    if (!window.confirm("Delete this booking? This cannot be undone.")) return;
+    const status = getStatus(item);
+    let confirmMessage = "Cancel this booking? This will mark the event as cancelled.";
+    
+    if (status === "paid") {
+      confirmMessage = "Cancel this booking? Since it's fully paid, 50% will be refunded.";
+    } else if (status === "partial") {
+      confirmMessage = "Cancel this booking? Since it's partially paid, no refund will be given.";
+    }
+
+    if (!window.confirm(confirmMessage)) return;
 
     try {
-      await deleteBooking(item.booking.id);
+      const result = await cancelBooking(item.booking.id);
+      
+      if (result.refunded) {
+        alert(`Booking cancelled. Refund of ${formatCurrency(result.refundAmount)} will be processed.`);
+      } else {
+        alert("Booking cancelled successfully.");
+      }
+      
       navigate("/bookings");
     } catch (err: unknown) {
-      alert("Failed to delete: " + (err instanceof Error ? err.message : String(err)));
+      alert("Failed to cancel: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -63,20 +79,24 @@ function BookingDetail() {
             </button>
             <button
               type="button"
-              onClick={handleDelete}
-              className="btn-destructive flex items-center gap-2"
+              onClick={handleCancel}
+              disabled={item.booking.status === "cancelled"}
+              className="btn-destructive flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 className="h-4 w-4" />
-              Delete
+              <Ban className="h-4 w-4" />
+              {item.booking.status === "cancelled" ? "Event Cancelled" : "Cancel Event"}
             </button>
           </div>
           <div className="flex items-center gap-4">
             <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{item.client.name}</h1>
             <span
-              className={`badge ${status === "paid"
-                ? "badge-paid"
-                : "badge-partial"
-                }`}
+              className={`badge ${
+                status === "paid"
+                  ? "badge-paid"
+                  : status === "cancelled"
+                  ? "badge-cancelled"
+                  : "badge-partial"
+              }`}
             >
               {status}
             </span>
@@ -145,7 +165,7 @@ function BookingDetail() {
         <div className="rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-foreground">Payment History</h3>
-            {item.remainingAmount > 0 && (
+            {item.remainingAmount > 0 && item.booking.status !== "cancelled" && (
               <button
                 type="button"
                 onClick={() => setAddPaymentModalOpen(true)}
