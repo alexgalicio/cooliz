@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { cancelBooking } from "../services/storage";
 import { AddPaymentModal } from "../components/payment/AddPaymentModal";
+import { CancelConfirmationModal } from "../components/booking/CancelConfirmationModal";
 import { Ban, ArrowLeft, Plus } from "lucide-react";
 import { useState } from "react";
 import { BookingDetails } from "../types/booking";
@@ -12,6 +13,7 @@ function BookingDetail() {
   const location = useLocation();
   const item = location.state as BookingDetails | undefined;
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   // if no booking passed, show a message
   if (!item) {
@@ -32,33 +34,46 @@ function BookingDetail() {
     );
   }
 
-  // function to cancel booking
-  async function handleCancel() {
-    if (!item?.booking.id) return;
-
+  // function to get confirmation message based on payment status
+  function getCancelMessage() {
+    if (!item) return "";
     const status = getStatus(item);
-    let confirmMessage = "Cancel this booking? This will mark the event as cancelled.";
     
     if (status === "paid") {
-      confirmMessage = "Cancel this booking? Since it's fully paid, 50% will be refunded.";
+      return "Cancel this booking? Since it's fully paid, 50% will be refunded.";
     } else if (status === "partial") {
-      confirmMessage = "Cancel this booking? Since it's partially paid, no refund will be given.";
+      return "Cancel this booking? Since it's partially paid, no refund will be given.";
     }
+    return "Cancel this booking? This will mark the event as cancelled.";
+  }
 
-    if (!window.confirm(confirmMessage)) return;
+  // function to cancel booking
+  async function handleCancelConfirm() {
+    if (!item?.booking.id) {
+      return { success: false, message: "Booking ID not found." };
+    }
 
     try {
       const result = await cancelBooking(item.booking.id);
       
+      let message = "";
       if (result.refunded) {
-        alert(`Booking cancelled. Refund of ${formatCurrency(result.refundAmount)} will be processed.`);
+        message = `Booking cancelled. Refund of ${formatCurrency(result.refundAmount)} will be processed.`;
       } else {
-        alert("Booking cancelled successfully.");
+        message = "Booking cancelled successfully.";
       }
       
-      navigate("/bookings");
+      // Navigate after a short delay to let user see the message
+      setTimeout(() => {
+        navigate("/bookings");
+      }, 2000);
+      
+      return { success: true, message };
     } catch (err: unknown) {
-      alert("Failed to cancel: " + (err instanceof Error ? err.message : String(err)));
+      return { 
+        success: false, 
+        message: "Failed to cancel: " + (err instanceof Error ? err.message : String(err))
+      };
     }
   }
 
@@ -79,7 +94,7 @@ function BookingDetail() {
             </button>
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={() => setCancelModalOpen(true)}
               disabled={item.booking.status === "cancelled"}
               className="btn-destructive flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -210,6 +225,15 @@ function BookingDetail() {
           onSuccess={(updated) =>
             navigate(location.pathname, { state: updated, replace: true })
           }
+        />
+
+        {/* cancel confirmation modal */}
+        <CancelConfirmationModal
+          open={cancelModalOpen}
+          onClose={() => setCancelModalOpen(false)}
+          onConfirm={handleCancelConfirm}
+          message={getCancelMessage()}
+          clientName={item.client.name}
         />
       </div>
     </MainLayout>
