@@ -37,7 +37,10 @@ export function formatCurrency(n: number) {
 }
 
 // determine the payment status of booking
-export function getStatus(item: BookingDetails): "pending" | "partial" | "paid" {
+export function getStatus(item: BookingDetails): "pending" | "partial" | "paid" | "cancelled" {
+  // check if booking is cancelled first
+  if (item.booking.status === "cancelled") return "cancelled";
+  
   if (item.remainingAmount <= 0) return "paid";
   if (item.payments.length > 0) return "partial";
   return "pending"; // just incase no payments yet

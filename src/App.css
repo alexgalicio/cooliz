@@ -21,6 +21,11 @@
    --color-sidebar-accent: oklch(0.967 0.001 286.375);
    --color-sidebar-accent-foreground: oklch(0.21 0.006 285.885);
    --color-sidebar-border: oklch(0.92 0.004 286.32);
+
+   --color-blue: oklch(0.55 0.2 250);
+   --color-green: oklch(0.6 0.18 145);
+   --color-red: oklch(0.6 0.22 25);
+   --color-violet: oklch(0.6 0.2 290);
 }
 
 @layer components {
@@ -58,6 +63,10 @@
 
    .badge-partial {
       @apply bg-amber-600/10 text-amber-600;
+   }
+
+   .badge-cancelled {
+      @apply bg-gray-600/10 text-gray-600;
    }
 
    .required-field {
