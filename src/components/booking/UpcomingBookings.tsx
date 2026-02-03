@@ -92,8 +92,10 @@ export function UpcomingBookings() {
                   </p>
                   <span
                     className={`badge ${status === "paid"
-                      ? "badge-paid"
-                      : "badge-partial"
+                        ? "badge-paid"
+                        : status === "cancelled"
+                          ? "badge-cancelled"
+                          : "badge-partial"
                       }`}
                   >
                     {status}
@@ -123,10 +125,16 @@ export function UpcomingBookings() {
                       <p>{formatCurrency(item.booking.totalAmount)}</p>
                     </div>
                     {item.remainingAmount > 0 && (
-                      <p className="text-amber-600 font-medium">
+                      <p
+                        className={`font-medium ${status === "cancelled"
+                          ? "text-destructive"
+                          : "text-amber-600"
+                          }`}
+                      >
                         Balance: {formatCurrency(item.remainingAmount)}
                       </p>
                     )}
+
                   </div>
                 </div>
               </button>
