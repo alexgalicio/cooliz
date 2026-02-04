@@ -69,7 +69,7 @@ export async function getAllBookings() {
       c.email AS client_email
     FROM bookings b
     JOIN clients c ON b.client_id = c.id
-    ORDER BY b.start_date ASC
+    ORDER BY b.created_at DESC
     `
   );
 
