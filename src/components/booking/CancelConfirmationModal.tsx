@@ -6,7 +6,6 @@ type CancelConfirmationModalProps = {
   onClose: () => void;
   onConfirm: () => Promise<{ success: boolean; message: string }>;
   message: string;
-  clientName: string;
 };
 
 export function CancelConfirmationModal({
@@ -14,7 +13,6 @@ export function CancelConfirmationModal({
   onClose,
   onConfirm,
   message,
-  clientName,
 }: CancelConfirmationModalProps) {
   const [confirmText, setConfirmText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -84,11 +82,6 @@ export function CancelConfirmationModal({
           ) : (
             /* Confirmation Form */
             <>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Client</p>
-                <p className="font-medium text-foreground">{clientName}</p>
-              </div>
-
               <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                 <p className="text-sm text-foreground">{message}</p>
               </div>

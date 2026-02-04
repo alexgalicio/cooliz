@@ -62,12 +62,7 @@ function BookingDetail() {
       } else {
         message = "Booking cancelled successfully.";
       }
-      
-      // Navigate after a short delay to let user see the message
-      setTimeout(() => {
-        navigate("/bookings");
-      }, 2000);
-      
+            
       return { success: true, message };
     } catch (err: unknown) {
       return { 
@@ -233,7 +228,6 @@ function BookingDetail() {
           onClose={() => setCancelModalOpen(false)}
           onConfirm={handleCancelConfirm}
           message={getCancelMessage()}
-          clientName={item.client.name}
         />
       </div>
     </MainLayout>
