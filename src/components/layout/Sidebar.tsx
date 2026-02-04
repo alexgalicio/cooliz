@@ -32,8 +32,8 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* logo */}
           <div className="flex h-16 lg:h-20 items-center justify-between border-b border-sidebar-border px-4 lg:px-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 lg:h-10 lg:w-10 items-center justify-center rounded-lg bg-primary overflow-hidden">
-                <img src="/images/cooliz.jpg" alt="Logo" className="w-full h-full object-cover" />
+              <div className="flex h-9 w-9 lg:h-10 lg:w-10 items-center justify-center overflow-hidden">
+                <img src="/images/cooliz.png" alt="Cooliz Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="font-display text-base lg:text-lg font-semibold text-sidebar-foreground">Cooliz</h1>

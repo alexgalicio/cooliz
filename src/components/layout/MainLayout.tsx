@@ -12,7 +12,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       {/* reponsive header */}
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background px-4 lg:hidden">
         <button
@@ -22,8 +22,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           <Menu className="h-5 w-5 text-foreground" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary overflow-hidden">
-            <img src="/images/cooliz.jpg" alt="Logo" className="w-full h-full object-cover" />
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden">
+            <img src="/images/cooliz.png" alt="Cooliz Logo" className="w-full h-full object-cover" />
           </div>
           <span className="font-display font-semibold text-foreground">Cooliz</span>
         </div>
