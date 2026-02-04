@@ -11,6 +11,7 @@ function Bookings() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortByDate, setSortByDate] = useState<"asc" | "desc">("desc");
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -34,27 +35,46 @@ function Bookings() {
   }, []);
 
   const filtered = bookings.filter((item) => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
+    const searchAsDate = (() => {
+      if (!q) return null;
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(q)) return q;
+
+      const d = new Date(q);
+      if (Number.isNaN(d.getTime())) return null;
+
+      const y = d.getFullYear(),
+        m = String(d.getMonth() + 1).padStart(2, "0"),
+        day = String(d.getDate()).padStart(2, "0");
+
+      return `${y}-${m}-${day}`;
+    })();
     const matchesSearch =
-      !q || // if searchs empty, match all
-      item.client.name.toLowerCase().includes(q); // match client name
-
-    const status = getStatus(item); // get booking status
+      !q ||
+      (searchAsDate
+        ? item.booking.startDate.slice(0, 10) === searchAsDate
+        : item.client.name.toLowerCase().includes(q));
+    const status = getStatus(item);
     const matchesStatus = statusFilter === "all" || status === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
-  // reset to first page when filters/search change
+  const sorted = [...filtered].sort((a, b) => {
+    const dateA = new Date(a.booking.startDate).getTime();
+    const dateB = new Date(b.booking.startDate).getTime();
+    return sortByDate === "asc" ? dateA - dateB : dateB - dateA;
+  });
+
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, sortByDate]);
 
-  const totalItems = filtered.length;
+  const totalItems = sorted.length;
   const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / pageSize);
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginated = filtered.slice(startIndex, startIndex + pageSize);
+  const paginated = sorted.slice(startIndex, startIndex + pageSize);
 
   return (
     <MainLayout>
@@ -86,11 +106,20 @@ function Bookings() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
+            className="input-elegant"
           >
             <option value="all">All Status</option>
             <option value="partial">Partial</option>
             <option value="paid">Paid</option>
             <option value="cancelled">Cancelled</option>
+          </select>
+          <select
+            value={sortByDate}
+            onChange={(e) => setSortByDate(e.target.value as "asc" | "desc")}
+            className="input-elegant"
+          >
+            <option value="asc">Date: Oldest</option>
+            <option value="desc">Date: Newest</option>
           </select>
         </div>
 
