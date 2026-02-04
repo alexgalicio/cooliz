@@ -1,5 +1,5 @@
 <div align="center">
-<img src="public/images/cooliz.jpg" alt="Cooliz Logo" width="20%" style="border-radius: 12px"/>
+<img src="public/images/cooliz.png" alt="Cooliz Logo" width="20%"/>
 <h1>Cooliz</h1>
 
 A desktop app for managing bookings at [Cooliz](https://www.facebook.com/resort.cooliz/) resort.
