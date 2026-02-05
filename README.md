@@ -28,7 +28,7 @@ A desktop app for managing bookings at [Cooliz](https://www.facebook.com/resort.
 
 ## Download
 
-You can download the latest version from the [releases page](ttps://github.com/alexgalicio/cooliz/releases)
+You can download the latest version from the [releases page](https://github.com/alexgalicio/cooliz/releases)
 
 ## Prerequisites
 
