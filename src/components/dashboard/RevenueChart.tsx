@@ -14,18 +14,21 @@ export function RevenueChart({ data }: RevenueChartProps) {
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis 
-            dataKey="month" 
+          <XAxis
+            dataKey="month"
             stroke="#6b7280"
             style={{ fontSize: '12px' }}
           />
-          <YAxis 
+          <YAxis
             stroke="#6b7280"
             style={{ fontSize: '12px' }}
             tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
           />
-          <Tooltip 
-            formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']}
+          <Tooltip
+            formatter={(value: number | undefined) => {
+              if (value == null) return ['', 'Revenue']; // handle undefined
+              return [`₱${value.toLocaleString()}`, 'Revenue'];
+            }}
             contentStyle={{
               backgroundColor: '#fff',
               border: '1px solid #e5e7eb',
@@ -33,8 +36,8 @@ export function RevenueChart({ data }: RevenueChartProps) {
               fontSize: '12px'
             }}
           />
-          <Bar 
-            dataKey="revenue" 
+          <Bar
+            dataKey="revenue"
             fill="#f97316"
             radius={[8, 8, 0, 0]}
           />
