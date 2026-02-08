@@ -5,6 +5,13 @@ export interface Client {
   email?: string;
 }
 
+export interface ExtraAmenity {
+  item: string;
+  price: number;
+  quantity: number;
+  total: number;
+}
+
 export interface Booking {
   id?: number;
   clientId: number;
@@ -13,6 +20,7 @@ export interface Booking {
   endDate: string;
   totalAmount: number;
   status?: "active" | "cancelled";
+  extraAmenities?: ExtraAmenity[] | null;
 }
 
 export interface Payment {
