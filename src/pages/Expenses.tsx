@@ -1,0 +1,298 @@
+import { useEffect, useState } from "react";
+import { MainLayout } from "../components/layout/MainLayout";
+import { addExpense, getAllExpenses } from "../services/storage";
+import { formatCurrency, formatDate } from "../utils/formatter";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+
+const expenseCategories = [
+  "Supplies",
+  "Utilities",
+  "Maintenance",
+  "Staff",
+  "Marketing",
+  "Taxes",
+  "Other",
+];
+
+type ExpenseForm = {
+  category: string;
+  description: string;
+  amount: string;
+  expenseDate: string;
+};
+
+function Expenses() {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${now.getFullYear()}-${month}`;
+  });
+  const [form, setForm] = useState<ExpenseForm>({
+    category: "",
+    description: "",
+    amount: "",
+    expenseDate: "",
+  });
+
+  useEffect(() => {
+    loadExpenses();
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [monthFilter, expenses]);
+
+  async function loadExpenses() {
+    setLoading(true);
+    try {
+      const data = await getAllExpenses();
+      setExpenses(data);
+    } catch (err) {
+      console.error("Failed to load expenses:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!form.category || !form.amount || !form.expenseDate) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    const amount = Number(form.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Amount must be a number greater than 0.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await addExpense({
+        category: form.category,
+        description: form.description,
+        amount,
+        expenseDate: form.expenseDate,
+      });
+      setForm({ category: "", description: "", amount: "", expenseDate: "" });
+      await loadExpenses();
+    } catch (err: any) {
+      alert("Error: " + (err?.message ?? err?.toString() ?? "Failed to save expense"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const getMonthKey = (dateString: string) => dateString.slice(0, 7);
+  const filteredExpenses = monthFilter
+    ? expenses.filter((expense) => getMonthKey(expense.expense_date) === monthFilter)
+    : expenses;
+
+  const monthlyTotal = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const monthlyCount = filteredExpenses.length;
+  const monthLabel = monthFilter
+    ? new Date(`${monthFilter}-01`).toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      })
+    : "All Months";
+
+  const totalItems = filteredExpenses.length;
+  const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / pageSize);
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginated = filteredExpenses.slice(startIndex, startIndex + pageSize);
+
+  return (
+    <MainLayout>
+      <div className="space-y-8">
+        {/* header */}
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">Expenses</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">Track and manage your expenses</p>
+        </div>
+
+        {/* add expense */}
+        <div className="rounded-xl border border-border p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">Add Expense</h3>
+          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Date <span className="required-field">*</span>
+              </label>
+              <input
+                type="date"
+                value={form.expenseDate}
+                onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Category <span className="required-field">*</span>
+              </label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              >
+                <option value="">Select category</option>
+                {expenseCategories.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+              <input
+                type="text"
+                placeholder="Optional description"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Amount <span className="required-field">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end">
+              <button type="submit" className="btn-primary flex items-center gap-2" disabled={saving}>
+                <Plus className="h-4 w-4" />
+                {saving ? "Saving..." : "Add Expense"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* monthly summary */}
+        <div className="rounded-xl border border-border p-6 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Monthly Summary</h3>
+              <p className="text-sm text-muted-foreground">{monthLabel}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="month"
+                className="input-elegant"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setMonthFilter("")}
+              >
+                All Months
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground">Total Expenses</p>
+              <p className="text-2xl font-bold text-foreground mt-1">
+                {formatCurrency(monthlyTotal)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground">Entries</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{monthlyCount}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* expenses table */}
+        {loading ? (
+          <div className="rounded-xl border border-border p-8 text-center text-muted-foreground">
+            Loading...
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border overflow-hidden">
+              {filteredExpenses.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">No expenses found.</div>
+              ) : (
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="px-4 py-3 font-semibold text-foreground">Date</th>
+                      <th className="px-4 py-3 font-semibold text-foreground">Category</th>
+                      <th className="px-4 py-3 font-semibold text-foreground">Description</th>
+                      <th className="px-4 py-3 font-semibold text-foreground">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((expense) => (
+                      <tr
+                        key={expense.id}
+                        className="border-b border-border last:border-b-0 bg-background hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {formatDate(expense.expense_date)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">{expense.category}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{expense.description || "-"}</td>
+                        <td className="px-4 py-3 text-foreground font-medium">
+                          {formatCurrency(expense.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* pagination */}
+            {totalItems > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
+                <span>
+                  Showing {startIndex + 1}-
+                  {Math.min(startIndex + pageSize, totalItems)} of {totalItems} expenses
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-outline px-2 py-1"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-outline px-2 py-1"
+                    disabled={currentPage >= totalPages}
+                    onClick={() =>
+                      setPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
+
+export default Expenses;
