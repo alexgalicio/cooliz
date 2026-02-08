@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import { Booking, BookingDetails, Client, Payment } from "../types/booking";
+import { Expense } from "../types/expense";
 
 let db: Database | null = null;
 
@@ -23,10 +24,11 @@ export async function createClient(client: Client): Promise<number> {
 // create booking
 export async function createBooking(booking: Booking): Promise<number> {
   const database = await getDb();
+  const extraAmenities = booking.extraAmenities ? JSON.stringify(booking.extraAmenities) : null;
   const result = await database.execute(
     `INSERT INTO bookings 
-      (client_id, event_type, start_date, end_date, total_amount, status)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+      (client_id, event_type, start_date, end_date, total_amount, status, extra_amenities)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       booking.clientId,
       booking.eventType,
@@ -34,6 +36,7 @@ export async function createBooking(booking: Booking): Promise<number> {
       booking.endDate,
       booking.totalAmount,
       booking.status || 'active',
+      extraAmenities,
     ]
   );
   return result.lastInsertId!;
@@ -46,6 +49,21 @@ export async function addPayment(payment: Payment) {
     `INSERT INTO payments (booking_id, amount, payment_type)
      VALUES (?, ?, ?)`,
     [payment.bookingId, payment.amount, payment.paymentType]
+  );
+}
+
+export async function updateBookingExtraAmenities(
+  bookingId: number,
+  extraAmenities: Booking["extraAmenities"]
+) {
+  const database = await getDb();
+  const payload = extraAmenities ? JSON.stringify(extraAmenities) : null;
+
+  await database.execute(
+    `UPDATE bookings
+     SET extra_amenities = ?
+     WHERE id = ?`,
+    [payload, bookingId]
   );
 }
 
@@ -63,6 +81,7 @@ export async function getAllBookings() {
       b.end_date,
       b.total_amount,
       b.status,
+      b.extra_amenities,
       b.created_at,
       c.name AS client_name,
       c.phone AS client_phone,
@@ -85,7 +104,25 @@ export async function getAllBookings() {
     );
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const remainingAmount = row.total_amount - totalPaid;
+    let extraAmenities = null;
+    let amenitiesTotal = 0;
+
+    if (row.extra_amenities) {
+      try {
+        extraAmenities = JSON.parse(row.extra_amenities);
+        if (Array.isArray(extraAmenities)) {
+          amenitiesTotal = extraAmenities.reduce(
+            (sum: number, item: { total?: number }) => sum + (item.total || 0),
+            0
+          );
+        }
+      } catch {
+        extraAmenities = null;
+      }
+    }
+
+    const totalAmountWithAmenities = row.total_amount + amenitiesTotal;
+    const remainingAmount = totalAmountWithAmenities - totalPaid;
 
     results.push({
       booking: {
@@ -94,8 +131,9 @@ export async function getAllBookings() {
         eventType: row.event_type,
         startDate: row.start_date,
         endDate: row.end_date,
-        totalAmount: row.total_amount,
+        totalAmount: totalAmountWithAmenities,
         status: row.status,
+        extraAmenities: extraAmenities,
       },
       client: {
         id: row.client_id,
@@ -208,6 +246,56 @@ export async function getAllPayments() {
   }));
 }
 
+export async function addExpense(expense: Expense) {
+  const database = await getDb();
+  await database.execute(
+    `INSERT INTO expenses (category, description, amount, expense_date)
+     VALUES (?, ?, ?, ?)`,
+    [expense.category, expense.description, expense.amount, expense.expenseDate]
+  );
+}
+
+export async function getAllExpenses() {
+  const db = await getDb();
+  return db.select(
+    `SELECT id, category, description, amount, expense_date, created_at
+     FROM expenses
+     ORDER BY expense_date DESC, created_at DESC`
+  );
+}
+
+export async function getExpensesTotal(startDate?: string, endDate?: string): Promise<number> {
+  const db = await getDb();
+
+  let query = "SELECT SUM(amount) as total FROM expenses";
+  const params: string[] = [];
+
+  if (startDate && endDate) {
+    query += " WHERE expense_date >= ? AND expense_date <= ?";
+    params.push(startDate, endDate);
+  }
+
+  const rows: Array<{ total: number | null }> = await db.select(query, params.length ? params : undefined);
+  return rows[0]?.total || 0;
+}
+
+export async function getExpensesByRange(startDate?: string, endDate?: string) {
+  const db = await getDb();
+
+  let query = `SELECT id, category, description, amount, expense_date, created_at
+               FROM expenses`;
+  const params: string[] = [];
+
+  if (startDate && endDate) {
+    query += " WHERE expense_date >= ? AND expense_date <= ?";
+    params.push(startDate, endDate);
+  }
+
+  query += " ORDER BY expense_date DESC, created_at DESC";
+
+  return db.select(query, params.length ? params : undefined);
+}
+
 // get monthly stats for dashboard
 export async function getMonthlyStats() {
   const db = await getDb();
@@ -221,7 +309,7 @@ export async function getMonthlyStats() {
   const bookingsCount: Array<{ count: number }> = await db.select(
     `SELECT COUNT(*) as count 
      FROM bookings 
-     WHERE created_at >= ? AND created_at <= ? AND status != 'cancelled'`,
+     WHERE start_date >= ? AND start_date <= ? AND status != 'cancelled'`,
     [firstDay, lastDay]
   );
 
@@ -231,17 +319,32 @@ export async function getMonthlyStats() {
     `SELECT SUM(p.amount) as total 
      FROM payments p
      JOIN bookings b ON p.booking_id = b.id
-     WHERE b.created_at >= ? AND b.created_at <= ?`,
+     WHERE b.start_date >= ? AND b.start_date <= ?`,
     [firstDay, lastDay]
   );
   
   const totalRevenue = revenueResult[0]?.total || 0;
+  const amenitiesRows: Array<{ extra_amenities: string | null }> = await db.select(
+    `SELECT extra_amenities
+     FROM bookings
+     WHERE start_date >= ? AND start_date <= ? AND status != 'cancelled'`,
+    [firstDay, lastDay]
+  );
+  const amenitiesTotal = amenitiesRows.reduce((sum, row) => {
+    if (!row.extra_amenities) return sum;
+    try {
+      const amenities = JSON.parse(row.extra_amenities) as Array<{ total?: number }>;
+      return sum + amenities.reduce((amenitySum, item) => amenitySum + (item.total || 0), 0);
+    } catch {
+      return sum;
+    }
+  }, 0);
 
   // Pending payments (bookings with remaining amount > 0, excluding cancelled)
   const bookings: any[] = await db.select(
-    `SELECT b.id, b.total_amount 
+    `SELECT b.id, b.total_amount, b.extra_amenities 
      FROM bookings b
-     WHERE b.created_at >= ? AND b.created_at <= ? AND b.status != 'cancelled'`,
+     WHERE b.start_date >= ? AND b.start_date <= ? AND b.status != 'cancelled'`,
     [firstDay, lastDay]
   );
 
@@ -255,7 +358,19 @@ export async function getMonthlyStats() {
     );
     
     const totalPaid = payments[0]?.total || 0;
-    const remaining = booking.total_amount - totalPaid;
+    let amenitiesTotal = 0;
+
+    if (booking.extra_amenities) {
+      try {
+        const amenities = JSON.parse(booking.extra_amenities) as Array<{ total?: number }>;
+        amenitiesTotal = amenities.reduce((sum, item) => sum + (item.total || 0), 0);
+      } catch {
+        amenitiesTotal = 0;
+      }
+    }
+
+    const totalWithAmenities = booking.total_amount + amenitiesTotal;
+    const remaining = totalWithAmenities - totalPaid;
     
     if (remaining > 0) {
       pendingAmount += remaining;
@@ -266,7 +381,7 @@ export async function getMonthlyStats() {
 
   return {
     totalBookings: bookingsCount[0]?.count || 0,
-    totalRevenue: totalRevenue,
+    totalRevenue: totalRevenue + amenitiesTotal,
     pendingPayments: pendingAmount,
     fullyPaid: fullyPaidCount,
   };
@@ -289,12 +404,27 @@ export async function getMonthlyRevenueForecast() {
       `SELECT SUM(p.amount) as total 
        FROM payments p
        JOIN bookings b ON p.booking_id = b.id
-       WHERE b.created_at >= ? AND b.created_at <= ?`,
+       WHERE b.start_date >= ? AND b.start_date <= ?`,
       [firstDay, lastDay]
     );
+    const amenitiesRows: Array<{ extra_amenities: string | null }> = await db.select(
+      `SELECT extra_amenities
+       FROM bookings
+       WHERE start_date >= ? AND start_date <= ? AND status != 'cancelled'`,
+      [firstDay, lastDay]
+    );
+    const amenitiesTotal = amenitiesRows.reduce((sum, row) => {
+      if (!row.extra_amenities) return sum;
+      try {
+        const amenities = JSON.parse(row.extra_amenities) as Array<{ total?: number }>;
+        return sum + amenities.reduce((amenitySum, item) => amenitySum + (item.total || 0), 0);
+      } catch {
+        return sum;
+      }
+    }, 0);
     
     const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-    const revenue = revenueResult[0]?.total || 0;
+    const revenue = (revenueResult[0]?.total || 0) + amenitiesTotal;
     
     monthsData.push({
       month: monthName,
@@ -316,6 +446,7 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
       b.start_date,
       b.end_date,
       b.total_amount,
+      b.extra_amenities,
       b.status,
       b.created_at,
       c.name AS client_name,
@@ -328,7 +459,7 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
   const params: string[] = [];
   
   if (startDate && endDate) {
-    query += ` WHERE b.created_at >= ? AND b.created_at <= ?`;
+    query += ` WHERE b.start_date >= ? AND b.start_date <= ?`;
     params.push(startDate, endDate);
   }
   
@@ -346,7 +477,18 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
     );
     
     const totalPaid = payments[0]?.total || 0;
-    const remainingAmount = row.total_amount - totalPaid;
+    let amenitiesTotal = 0;
+
+    if (row.extra_amenities) {
+      try {
+        const amenities = JSON.parse(row.extra_amenities) as Array<{ total?: number }>;
+        amenitiesTotal = amenities.reduce((sum, item) => sum + (item.total || 0), 0);
+      } catch {
+        amenitiesTotal = 0;
+      }
+    }
+    const totalAmountWithAmenities = row.total_amount + amenitiesTotal;
+    const remainingAmount = totalAmountWithAmenities - totalPaid;
     
     results.push({
       bookingId: row.booking_id,
@@ -356,8 +498,9 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
       eventType: row.event_type,
       startDate: row.start_date,
       endDate: row.end_date,
-      totalAmount: row.total_amount,
+      totalAmount: totalAmountWithAmenities,
       totalPaid: totalPaid,
+      amenitiesTotal: amenitiesTotal,
       remainingAmount: remainingAmount,
       status: row.status,
       createdAt: row.created_at,
