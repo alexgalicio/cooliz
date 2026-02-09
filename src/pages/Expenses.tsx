@@ -99,9 +99,9 @@ function Expenses() {
   const monthlyCount = filteredExpenses.length;
   const monthLabel = monthFilter
     ? new Date(`${monthFilter}-01`).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      })
+      month: "long",
+      year: "numeric",
+    })
     : "All Months";
 
   const totalItems = filteredExpenses.length;
@@ -185,7 +185,7 @@ function Expenses() {
               <h3 className="text-lg font-semibold text-foreground">Monthly Summary</h3>
               <p className="text-sm text-muted-foreground">{monthLabel}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 whitespace-nowrap">
               <input
                 type="month"
                 className="input-elegant"
