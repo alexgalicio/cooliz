@@ -1,4 +1,4 @@
-import { Calendar, ChartLine, CreditCard, LayoutDashboard, Plus, X } from "lucide-react";
+import { Calendar, ChartLine, CreditCard, LayoutDashboard, Plus, Wallet, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const menuItems = [
@@ -7,6 +7,7 @@ const menuItems = [
   { icon: Plus, label: "New Booking", path: "/newBooking" },
   { icon: CreditCard, label: "Payments", path: "/payments" },
   { icon: ChartLine, label: "Sales Report", path: "/salesReport" },
+  { icon: Wallet, label: "Expenses", path: "/expenses" },
 ]
 
 interface SidebarProps {

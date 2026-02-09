@@ -31,19 +31,22 @@ export function AddPaymentModal({
         paymentType: "partial",
       });
 
+      const newPayment = {
+        bookingId: item.booking.id,
+        amount: item.remainingAmount,
+        paymentType: "partial" as const,
+        created_at: new Date().toISOString(),
+      };
+
+      const updatedPayments = [...item.payments, newPayment];
+      const totalPaid = updatedPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const newRemaining = Math.max(0, item.booking.totalAmount - totalPaid);
+
       // make new booking object with the payment 
       const updated: BookingDetails = {
         ...item, // keep everything same
-        payments: [
-          ...item.payments, // keep old payment
-          {
-            bookingId: item.booking.id,
-            amount: item.remainingAmount,
-            paymentType: "partial" as const,
-            created_at: new Date().toISOString(),
-          },
-        ],
-        remainingAmount: 0, // balance now 0
+        payments: updatedPayments,
+        remainingAmount: newRemaining,
       };
 
       onClose();

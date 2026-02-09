@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
-import { cancelBooking } from "../services/storage";
+import { cancelBooking, updateBookingExtraAmenities } from "../services/storage";
 import { AddPaymentModal } from "../components/payment/AddPaymentModal";
 import { CancelConfirmationModal } from "../components/booking/CancelConfirmationModal";
 import { Ban, ArrowLeft, Plus } from "lucide-react";
@@ -8,15 +8,50 @@ import { useState } from "react";
 import { BookingDetails } from "../types/booking";
 import { formatCurrency, formatDate, getStatus } from "../utils/formatter";
 
+const amenityOptions = [
+  "Chairs",
+  "Tables",
+  "Kitchen Items",
+  "Sound System",
+  "Lighting",
+  "Canopy / Tent",
+  "Other",
+];
+
+type AmenityInput = {
+  id: string;
+  item: string;
+  price: string;
+  quantity: string;
+};
+
 function BookingDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const item = location.state as BookingDetails | undefined;
+  const [details, setDetails] = useState<BookingDetails | null>(item ?? null);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [amenities, setAmenities] = useState<AmenityInput[]>(() => {
+    if (!item?.booking.extraAmenities || item.booking.extraAmenities.length === 0) {
+      return [{ id: crypto.randomUUID(), item: "", price: "", quantity: "" }];
+    }
+
+    return item.booking.extraAmenities.map((amenity) => ({
+      id: crypto.randomUUID(),
+      item: amenity.item,
+      price: amenity.price.toString(),
+      quantity: amenity.quantity.toString(),
+    }));
+  });
+  const [amenitiesSaving, setAmenitiesSaving] = useState(false);
+  const [savedAmenitiesKey, setSavedAmenitiesKey] = useState(() => {
+    const initialAmenities = item?.booking.extraAmenities ?? [];
+    return JSON.stringify(initialAmenities);
+  });
 
   // if no booking passed, show a message
-  if (!item) {
+  if (!details) {
     return (
       <MainLayout>
         <div className="space-y-6">
@@ -36,8 +71,8 @@ function BookingDetail() {
 
   // function to get confirmation message based on payment status
   function getCancelMessage() {
-    if (!item) return "";
-    const status = getStatus(item);
+    if (!details) return "";
+    const status = getStatus(details);
     
     if (status === "paid") {
       return "Cancel this booking? Since it's fully paid, 50% will be refunded.";
@@ -49,12 +84,12 @@ function BookingDetail() {
 
   // function to cancel booking
   async function handleCancelConfirm() {
-    if (!item?.booking.id) {
+    if (!details?.booking.id) {
       return { success: false, message: "Booking ID not found." };
     }
 
     try {
-      const result = await cancelBooking(item.booking.id);
+      const result = await cancelBooking(details.booking.id);
       
       let message = "";
       if (result.refunded) {
@@ -73,7 +108,139 @@ function BookingDetail() {
   }
 
   // get status if paid/partial
-  const status = getStatus(item);
+  const status = getStatus(details);
+
+  const updateAmenity = (id: string, field: keyof AmenityInput, value: string) => {
+    setAmenities((prev) =>
+      prev.map((amenity) =>
+        amenity.id === id ? { ...amenity, [field]: value } : amenity
+      )
+    );
+  };
+
+  const addAmenityRow = () => {
+    setAmenities((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), item: "", price: "", quantity: "" },
+    ]);
+  };
+
+  const removeAmenityRow = (id: string) => {
+    setAmenities((prev) => prev.filter((amenity) => amenity.id !== id));
+  };
+
+  const normalizeAmenities = () => {
+    return amenities
+      .map((amenity) => {
+        const itemValue = amenity.item.trim();
+        const price = Number(amenity.price);
+        const quantity = Number(amenity.quantity);
+        const hasAnyValue = itemValue || amenity.price || amenity.quantity;
+
+        if (!hasAnyValue) {
+          return null;
+        }
+
+        if (!itemValue) {
+          throw new Error("Please choose or enter an amenity item.");
+        }
+
+        if (!Number.isFinite(price) || price < 0) {
+          throw new Error("Amenity price must be a number 0 or greater.");
+        }
+
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new Error("Amenity quantity must be a number greater than 0.");
+        }
+
+        return {
+          item: itemValue,
+          price,
+          quantity,
+          total: price * quantity,
+        };
+      })
+      .filter((amenity) => amenity !== null);
+  };
+
+  const normalizeAmenitiesForCompare = () => {
+    return amenities
+      .map((amenity) => {
+        const itemValue = amenity.item.trim();
+        const price = Number(amenity.price);
+        const quantity = Number(amenity.quantity);
+
+        if (!itemValue || !Number.isFinite(price) || !Number.isFinite(quantity)) {
+          return null;
+        }
+
+        return {
+          item: itemValue,
+          price,
+          quantity,
+          total: price * quantity,
+        };
+      })
+      .filter((amenity) => amenity !== null);
+  };
+
+  const currentAmenitiesKey = JSON.stringify(normalizeAmenitiesForCompare());
+  const amenitiesUnchanged = currentAmenitiesKey === savedAmenitiesKey;
+
+  const amenitiesSubtotal = amenities.reduce((sum, amenity) => {
+    const price = Number(amenity.price);
+    const quantity = Number(amenity.quantity);
+
+    if (!Number.isFinite(price) || !Number.isFinite(quantity)) {
+      return sum;
+    }
+
+    return sum + price * quantity;
+  }, 0);
+
+  async function handleAmenitiesSave() {
+    if (!details?.booking.id) return;
+
+    let payload: Array<{ item: string; price: number; quantity: number; total: number }> = [];
+
+    try {
+      payload = normalizeAmenities() as Array<{ item: string; price: number; quantity: number; total: number }>;
+    } catch (err: any) {
+      alert("Error: " + (err?.message ?? err?.toString() ?? "Invalid amenities"));
+      return;
+    }
+
+    setAmenitiesSaving(true);
+    try {
+      const previousAmenitiesTotal = (details.booking.extraAmenities || []).reduce(
+        (sum, item) => sum + item.total,
+        0
+      );
+      const newAmenitiesTotal = payload.reduce((sum, item) => sum + item.total, 0);
+      const baseAmount = details.booking.totalAmount - previousAmenitiesTotal;
+      const newTotalAmount = baseAmount + newAmenitiesTotal;
+      const totalPaid = details.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const newRemaining = newTotalAmount - totalPaid;
+
+      await updateBookingExtraAmenities(details.booking.id, payload.length > 0 ? payload : []);
+      const updated: BookingDetails = {
+        ...details,
+        booking: {
+          ...details.booking,
+          extraAmenities: payload.length > 0 ? payload : [],
+          totalAmount: newTotalAmount,
+        },
+        remainingAmount: newRemaining,
+      };
+      setDetails(updated);
+      setSavedAmenitiesKey(JSON.stringify(updated.booking.extraAmenities ?? []));
+      navigate(location.pathname, { state: updated, replace: true });
+    } catch (err: any) {
+      alert("Error: " + (err?.message ?? err?.toString() ?? "Failed to save amenities"));
+    } finally {
+      setAmenitiesSaving(false);
+    }
+  }
 
   return (
     <MainLayout>
@@ -90,15 +257,15 @@ function BookingDetail() {
             <button
               type="button"
               onClick={() => setCancelModalOpen(true)}
-              disabled={item.booking.status === "cancelled"}
+              disabled={details.booking.status === "cancelled"}
               className="btn-destructive flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Ban className="h-4 w-4" />
-              {item.booking.status === "cancelled" ? "Event Cancelled" : "Cancel Event"}
+              {details.booking.status === "cancelled" ? "Event Cancelled" : "Cancel Event"}
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{item.client.name}</h1>
+            <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{details.client.name}</h1>
             <span
               className={`badge ${
                 status === "paid"
@@ -120,18 +287,18 @@ function BookingDetail() {
             <dl className="space-y-2 text-sm">
               <div>
                 <h3 className="text-muted-foreground">Name</h3>
-                <p className="font-medium text-foreground">{item.client.name}</p>
+                <p className="font-medium text-foreground">{details.client.name}</p>
               </div>
-              {item.client.phone && (
+              {details.client.phone && (
                 <div>
                   <h3 className="text-muted-foreground">Phone</h3>
-                  <p className="text-foreground">{item.client.phone}</p>
+                  <p className="text-foreground">{details.client.phone}</p>
                 </div>
               )}
-              {item.client.email && (
+              {details.client.email && (
                 <div>
                   <h3 className="text-muted-foreground">Email</h3>
-                  <p className="text-foreground">{item.client.email}</p>
+                  <p className="text-foreground">{details.client.email}</p>
                 </div>
               )}
             </dl>
@@ -141,33 +308,138 @@ function BookingDetail() {
           <div className="rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Event Details</h3>
             <dl className="space-y-2 text-sm">
-              {item.booking.eventType && (
+              {details.booking.eventType && (
                 <div>
                   <h3 className="text-muted-foreground">Type</h3>
-                  <p className="font-medium text-foreground">{item.booking.eventType}</p>
+                  <p className="font-medium text-foreground">{details.booking.eventType}</p>
                 </div>
               )}
               <div>
                 <h3 className="text-muted-foreground">Start</h3>
-                <p className="text-foreground">{formatDate(item.booking.startDate)}</p>
+                <p className="text-foreground">{formatDate(details.booking.startDate)}</p>
               </div>
               <div>
                 <h3 className="text-muted-foreground">End</h3>
-                <p className="text-foreground">{formatDate(item.booking.endDate)}</p>
+                <p className="text-foreground">{formatDate(details.booking.endDate)}</p>
               </div>
               <div>
                 <h3 className="text-muted-foreground">Total</h3>
                 <p className="font-medium text-foreground">
-                  {formatCurrency(item.booking.totalAmount)}
+                  {formatCurrency(details.booking.totalAmount)}
                 </p>
               </div>
               <div>
                 <h3 className="text-muted-foreground">Remaining</h3>
                 <p className="font-medium text-foreground">
-                  {formatCurrency(item.remainingAmount)}
+                  {formatCurrency(details.remainingAmount)}
                 </p>
               </div>
             </dl>
+          </div>
+        </div>
+
+        {/* extra amenities */}
+        <div className="rounded-xl border border-border p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h3 className="text-lg font-semibold text-foreground">Extra Amenities</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={addAmenityRow}
+                disabled={details.booking.status === "cancelled"}
+              >
+                Add Item
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleAmenitiesSave}
+                disabled={amenitiesSaving || details.booking.status === "cancelled" || amenitiesUnchanged}
+              >
+                {amenitiesSaving ? "Saving..." : amenitiesUnchanged ? "Saved" : "Save Amenities"}
+              </button>
+            </div>
+          </div>
+
+          <datalist id="booking-amenities-list">
+            {amenityOptions.map((amenity) => (
+              <option key={amenity} value={amenity} />
+            ))}
+          </datalist>
+
+          <div className="space-y-4">
+            {amenities.map((amenity, index) => {
+              const price = Number(amenity.price);
+              const quantity = Number(amenity.quantity);
+              const total = Number.isFinite(price) && Number.isFinite(quantity)
+                ? price * quantity
+                : 0;
+
+              return (
+                <div key={amenity.id} className="grid gap-3 md:grid-cols-12 items-end">
+                  <div className="space-y-2 md:col-span-4">
+                    <h4>Item</h4>
+                    <input
+                      list="booking-amenities-list"
+                      value={amenity.item}
+                      onChange={(e) => updateAmenity(amenity.id, "item", e.target.value)}
+                      type="text"
+                      placeholder={index === 0 ? "Chairs" : "Select or type"}
+                      disabled={details.booking.status === "cancelled"}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <h4>Price per Unit</h4>
+                    <input
+                      value={amenity.price}
+                      onChange={(e) => updateAmenity(amenity.id, "price", e.target.value)}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      disabled={details.booking.status === "cancelled"}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <h4>Quantity</h4>
+                    <input
+                      value={amenity.quantity}
+                      onChange={(e) => updateAmenity(amenity.id, "quantity", e.target.value)}
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      disabled={details.booking.status === "cancelled"}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <h4>Total</h4>
+                    <input
+                      value={total ? total.toFixed(2) : ""}
+                      readOnly
+                      type="text"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <button
+                      type="button"
+                      className="btn-outline w-full"
+                      onClick={() => removeAmenityRow(amenity.id)}
+                      disabled={amenities.length === 1 || details.booking.status === "cancelled"}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex items-center justify-end gap-3 text-sm">
+            <span className="text-muted-foreground">Amenities Subtotal</span>
+            <span className="font-semibold text-foreground">{amenitiesSubtotal.toFixed(2)}</span>
           </div>
         </div>
 
@@ -175,7 +447,7 @@ function BookingDetail() {
         <div className="rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-foreground">Payment History</h3>
-            {item.remainingAmount > 0 && item.booking.status !== "cancelled" && (
+            {details.remainingAmount > 0 && details.booking.status !== "cancelled" && (
               <button
                 type="button"
                 onClick={() => setAddPaymentModalOpen(true)}
@@ -186,7 +458,7 @@ function BookingDetail() {
               </button>
             )}
           </div>
-          {item.payments.length > 0 ? (
+          {details.payments.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
@@ -196,7 +468,7 @@ function BookingDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {item.payments.map((p, idx) => (
+                  {details.payments.map((p, idx) => (
                     <tr key={p.id ?? `p-${idx}`} className="border-b border-border last:border-b-0">
                       <td className="py-2 text-foreground">{formatCurrency(p.amount)}</td>
                       <td className="py-2 text-foreground">
@@ -216,10 +488,11 @@ function BookingDetail() {
         <AddPaymentModal
           open={addPaymentModalOpen}
           onClose={() => setAddPaymentModalOpen(false)}
-          item={item}
-          onSuccess={(updated) =>
-            navigate(location.pathname, { state: updated, replace: true })
-          }
+          item={details}
+          onSuccess={(updated) => {
+            setDetails(updated);
+            navigate(location.pathname, { state: updated, replace: true });
+          }}
         />
 
         {/* cancel confirmation modal */}

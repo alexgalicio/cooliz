@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "../components/layout/MainLayout";
-import { getSalesReport } from "../services/storage";
+import { getExpensesByRange, getExpensesTotal, getSalesReport } from "../services/storage";
 import { formatCurrency, formatDate } from "../utils/formatter";
 import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -9,20 +9,34 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 function SalesReport() {
   const [reportData, setReportData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startMonth, setStartMonth] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${now.getFullYear()}-${month}`;
+  });
+  const [endMonth, setEndMonth] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${now.getFullYear()}-${month}`;
+  });
+  const [expensesTotal, setExpensesTotal] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
-    loadReport();
+    const { startIso, endIso, expenseStart, expenseEnd } = getRangeForMonths(startMonth, endMonth);
+    loadReport(startIso, endIso, expenseStart, expenseEnd);
   }, []);
 
-  async function loadReport(start?: string, end?: string) {
+  async function loadReport(start?: string, end?: string, expenseStart?: string, expenseEnd?: string) {
     setLoading(true);
     try {
-      const data = await getSalesReport(start, end);
+      const [data, expenseTotal] = await Promise.all([
+        getSalesReport(start, end),
+        getExpensesTotal(expenseStart, expenseEnd),
+      ]);
       setReportData(data);
+      setExpensesTotal(expenseTotal);
     } catch (err) {
       console.error("Failed to load sales report:", err);
     } finally {
@@ -30,46 +44,48 @@ function SalesReport() {
     }
   }
 
-  function handleFilterChange() {
-    if (startDate && endDate) {
-      const start = new Date(startDate).toISOString();
-      const end = new Date(endDate + "T23:59:59").toISOString();
-      loadReport(start, end);
+  function getRangeForMonths(start: string, end: string) {
+    if (!start || !end) {
+      return {
+        startIso: undefined,
+        endIso: undefined,
+        expenseStart: undefined,
+        expenseEnd: undefined,
+      };
     }
+
+    const startDate = new Date(`${start}-01`);
+    const endDate = new Date(`${end}-01`);
+    const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
+
+    const startStr = normalizedStart.toISOString().split("T")[0];
+    const endStr = normalizedEnd.toISOString().split("T")[0];
+
+    return {
+      startIso: normalizedStart.toISOString(),
+      endIso: new Date(endStr + "T23:59:59").toISOString(),
+      expenseStart: startStr,
+      expenseEnd: endStr,
+    };
+  }
+
+  function handleMonthRangeChange(nextStart: string, nextEnd: string) {
+    setStartMonth(nextStart);
+    setEndMonth(nextEnd);
+    const { startIso, endIso, expenseStart, expenseEnd } = getRangeForMonths(nextStart, nextEnd);
+    loadReport(startIso, endIso, expenseStart, expenseEnd);
   }
 
   function setThisMonth() {
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    const startStr = firstDay.toISOString().split('T')[0];
-    const endStr = lastDay.toISOString().split('T')[0];
-    
-    setStartDate(startStr);
-    setEndDate(endStr);
-    
-    loadReport(firstDay.toISOString(), new Date(endStr + "T23:59:59").toISOString());
-  }
-
-  function setLastMonth() {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-    
-    const startStr = firstDay.toISOString().split('T')[0];
-    const endStr = lastDay.toISOString().split('T')[0];
-    
-    setStartDate(startStr);
-    setEndDate(endStr);
-    
-    loadReport(firstDay.toISOString(), new Date(endStr + "T23:59:59").toISOString());
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const monthValue = `${now.getFullYear()}-${month}`;
+    handleMonthRangeChange(monthValue, monthValue);
   }
 
   function setAllTime() {
-    setStartDate("");
-    setEndDate("");
-    loadReport();
+    handleMonthRangeChange("", "");
   }
 
   async function exportToCSV() {
@@ -90,11 +106,33 @@ function SalesReport() {
         "Total Amount",
         "Total Paid",
         "Remaining",
+        "Amenities Total",
         "Status",
         "Created At"
       ];
 
-      const csvRows = [
+      const { expenseStart, expenseEnd } = getRangeForMonths(startMonth, endMonth);
+      const expenseRows = await getExpensesByRange(expenseStart, expenseEnd) as Array<{
+        id: number;
+        category: string;
+        description?: string;
+        amount: number;
+        expense_date: string;
+      }>;
+
+      const rangeLabel = startMonth && endMonth ? `${startMonth} to ${endMonth}` : "All Time";
+      const summarySection = [
+        "Summary",
+        `Range,${rangeLabel}`,
+        `Total Bookings,${reportData.length}`,
+        `Total Revenue,${totalRevenue}`,
+        `Total Expenses,${expensesTotal}`,
+        `Net Income,${netIncome}`,
+        `Pending Payments,${totalPending}`,
+      ];
+
+      const salesSection = [
+        "Sales",
         headers.join(","),
         ...reportData.map(row => [
           row.bookingId,
@@ -107,9 +145,29 @@ function SalesReport() {
           row.totalAmount,
           row.totalPaid,
           row.remainingAmount,
+          row.amenitiesTotal || 0,
           row.status,
           `"${formatDate(row.createdAt)}"`
-        ].join(","))
+        ].join(",")),
+      ];
+
+      const expenseSection = [
+        "Expenses",
+        ["Date", "Category", "Description", "Amount"].join(","),
+        ...expenseRows.map((expense) => [
+          `"${formatDate(expense.expense_date)}"`,
+          `"${expense.category}"`,
+          `"${expense.description || ""}"`,
+          expense.amount,
+        ].join(",")),
+      ];
+
+      const csvRows = [
+        ...summarySection,
+        "",
+        ...salesSection,
+        "",
+        ...expenseSection
       ];
 
       const csvContent = csvRows.join("\n");
@@ -133,8 +191,12 @@ function SalesReport() {
     }
   }
 
-  const totalRevenue = reportData.reduce((sum, row) => sum + row.totalPaid, 0);
+  const totalRevenue = reportData.reduce(
+    (sum, row) => sum + row.totalPaid + (row.amenitiesTotal || 0),
+    0
+  );
   const totalPending = reportData.reduce((sum, row) => sum + row.remainingAmount, 0);
+  const netIncome = totalRevenue - expensesTotal;
 
   const totalItems = reportData.length;
   const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / pageSize);
@@ -153,56 +215,43 @@ function SalesReport() {
 
         {/* filters */}
         <div className="rounded-xl border border-border p-6 space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">Start Date</label>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Start Month</label>
               <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                type="month"
+                value={startMonth}
+                onChange={(e) => handleMonthRangeChange(e.target.value, endMonth)}
               />
             </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">End Date</label>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">End Month</label>
               <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                type="month"
+                value={endMonth}
+                onChange={(e) => handleMonthRangeChange(startMonth, e.target.value)}
               />
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
+              <button onClick={setThisMonth} className="btn-outline">
+                This Month
+              </button>
+              <button onClick={setAllTime} className="btn-outline">
+                All Time
+              </button>
               <button
-                onClick={handleFilterChange}
-                className="btn-primary"
-                disabled={!startDate || !endDate}
+                onClick={exportToCSV}
+                className="btn-primary flex items-center gap-2"
               >
-                Apply Filter
+                <Download className="h-4 w-4" />
+                Export to CSV
               </button>
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button onClick={setThisMonth} className="btn-outline">
-              This Month
-            </button>
-            <button onClick={setLastMonth} className="btn-outline">
-              Last Month
-            </button>
-            <button onClick={setAllTime} className="btn-outline">
-              All Time
-            </button>
-            <button
-              onClick={exportToCSV}
-              className="btn-primary flex items-center gap-2 ml-auto"
-            >
-              <Download className="h-4 w-4" />
-              Export to CSV
-            </button>
           </div>
         </div>
 
         {/* summary */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl border border-border p-6">
             <p className="text-sm text-muted-foreground">Total Bookings</p>
             <p className="text-2xl font-bold text-foreground mt-1">{reportData.length}</p>
@@ -210,6 +259,14 @@ function SalesReport() {
           <div className="rounded-xl border border-border p-6">
             <p className="text-sm text-muted-foreground">Total Revenue</p>
             <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(totalRevenue)}</p>
+          </div>
+          <div className="rounded-xl border border-border p-6">
+            <p className="text-sm text-muted-foreground">Total Expenses</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(expensesTotal)}</p>
+          </div>
+          <div className="rounded-xl border border-border p-6">
+            <p className="text-sm text-muted-foreground">Net Income</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(netIncome)}</p>
           </div>
           <div className="rounded-xl border border-border p-6">
             <p className="text-sm text-muted-foreground">Pending Payments</p>
