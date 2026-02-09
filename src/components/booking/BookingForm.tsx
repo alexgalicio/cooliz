@@ -408,10 +408,10 @@ function BookingForm() {
                     placeholder="0.00"
                   />
                 </div>
-                <div className="md:col-span-2">
+                <div className="space-y-2 md:col-span-2">
                   <button
                     type="button"
-                    className="btn-outline w-full"
+                    className="btn-outline w-full h-[42px]"
                     onClick={() => removeAmenityRow(amenity.id)}
                     disabled={extraAmenities.length === 1}
                   >
