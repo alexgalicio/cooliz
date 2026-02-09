@@ -135,7 +135,7 @@ export async function getAllBookings() {
         eventType: row.event_type,
         startDate: row.start_date,
         endDate: row.end_date,
-        totalAmount: row.total_amount,
+        totalAmount: totalAmountWithAmenities,
         status: row.status,
         extraAmenities: extraAmenities,
       },
