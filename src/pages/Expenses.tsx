@@ -51,7 +51,7 @@ function Expenses() {
     setLoading(true);
     try {
       const data = await getAllExpenses();
-      setExpenses(data);
+      setExpenses(data as any[]);
     } catch (err) {
       console.error("Failed to load expenses:", err);
     } finally {
