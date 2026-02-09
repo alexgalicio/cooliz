@@ -58,7 +58,6 @@ function Payments() {
                       <th className="px-4 py-3 font-semibold text-foreground">Event Type</th>
                       <th className="px-4 py-3 font-semibold text-foreground">Event Date</th>
                       <th className="px-4 py-3 font-semibold text-foreground">Amount Paid</th>
-                      <th className="px-4 py-3 font-semibold text-foreground">Total Amount</th>
                       <th className="px-4 py-3 font-semibold text-foreground">Payment Date</th>
                     </tr>
                   </thead>
@@ -75,9 +74,6 @@ function Payments() {
                         </td>
                         <td className="px-4 py-3 text-foreground font-medium">
                           {formatCurrency(payment.amount)}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatCurrency(payment.totalAmount)}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {formatDate(payment.created_at)}
