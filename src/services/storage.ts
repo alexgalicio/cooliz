@@ -97,13 +97,16 @@ export async function getAllBookings() {
 
   for (const row of bookingsRaw) {
     const payments: Payment[] = await db.select(
-      `SELECT id, booking_id, amount, payment_type, created_at 
+      `SELECT id, booking_id, amount, payment_type as paymentType, created_at 
        FROM payments 
        WHERE booking_id = ?`,
       [row.booking_id]
     );
 
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments.reduce(
+      (sum, p) => (p.paymentType === "refund" ? sum : sum + p.amount),
+      0
+    );
     let extraAmenities = null;
     let amenitiesTotal = 0;
 
@@ -121,8 +124,9 @@ export async function getAllBookings() {
       }
     }
 
-    const totalAmountWithAmenities = row.total_amount + amenitiesTotal;
-    const remainingAmount = totalAmountWithAmenities - totalPaid;
+    const remainingAmount = row.status === "cancelled"
+      ? 0
+      : row.total_amount + amenitiesTotal - totalPaid;
 
     results.push({
       booking: {
@@ -131,7 +135,7 @@ export async function getAllBookings() {
         eventType: row.event_type,
         startDate: row.start_date,
         endDate: row.end_date,
-        totalAmount: totalAmountWithAmenities,
+        totalAmount: row.total_amount,
         status: row.status,
         extraAmenities: extraAmenities,
       },
@@ -178,7 +182,8 @@ export async function cancelBooking(bookingId: number) {
   
   // Calculate total paid
   const payments: Array<{ total: number | null }> = await db.select(
-    "SELECT SUM(amount) as total FROM payments WHERE booking_id = ?",
+    `SELECT SUM(CASE WHEN payment_type != 'refund' THEN amount ELSE 0 END) as total
+     FROM payments WHERE booking_id = ?`,
     [bookingId]
   );
   
@@ -194,7 +199,13 @@ export async function cancelBooking(bookingId: number) {
     await db.execute(
       `INSERT INTO payments (booking_id, amount, payment_type)
        VALUES (?, ?, ?)`,
-      [bookingId, -refundAmount, "refund"]
+      [bookingId, refundAmount, 'refund']
+    );
+    await db.execute(
+      `UPDATE bookings
+       SET refunded_amount = COALESCE(refunded_amount, 0) + ?
+       WHERE id = ?`,
+      [refundAmount, bookingId]
     );
   }
   // If partial payment, no refund (do nothing)
@@ -319,26 +330,17 @@ export async function getMonthlyStats() {
     `SELECT SUM(p.amount) as total 
      FROM payments p
      JOIN bookings b ON p.booking_id = b.id
-     WHERE b.start_date >= ? AND b.start_date <= ?`,
+     WHERE b.start_date >= ? AND b.start_date <= ? AND p.payment_type != 'refund'`,
+    [firstDay, lastDay]
+  );
+  const refundedResult: Array<{ total: number | null }> = await db.select(
+    `SELECT SUM(COALESCE(refunded_amount, 0)) as total
+     FROM bookings
+     WHERE start_date >= ? AND start_date <= ?`,
     [firstDay, lastDay]
   );
   
-  const totalRevenue = revenueResult[0]?.total || 0;
-  const amenitiesRows: Array<{ extra_amenities: string | null }> = await db.select(
-    `SELECT extra_amenities
-     FROM bookings
-     WHERE start_date >= ? AND start_date <= ? AND status != 'cancelled'`,
-    [firstDay, lastDay]
-  );
-  const amenitiesTotal = amenitiesRows.reduce((sum, row) => {
-    if (!row.extra_amenities) return sum;
-    try {
-      const amenities = JSON.parse(row.extra_amenities) as Array<{ total?: number }>;
-      return sum + amenities.reduce((amenitySum, item) => amenitySum + (item.total || 0), 0);
-    } catch {
-      return sum;
-    }
-  }, 0);
+  const totalRevenue = (revenueResult[0]?.total || 0) - (refundedResult[0]?.total || 0);
 
   // Pending payments (bookings with remaining amount > 0, excluding cancelled)
   const bookings: any[] = await db.select(
@@ -353,7 +355,8 @@ export async function getMonthlyStats() {
 
   for (const booking of bookings) {
     const payments: Array<{ total: number | null }> = await db.select(
-      `SELECT SUM(amount) as total FROM payments WHERE booking_id = ?`,
+      `SELECT SUM(CASE WHEN payment_type != 'refund' THEN amount ELSE 0 END) as total
+       FROM payments WHERE booking_id = ?`,
       [booking.id]
     );
     
@@ -381,7 +384,7 @@ export async function getMonthlyStats() {
 
   return {
     totalBookings: bookingsCount[0]?.count || 0,
-    totalRevenue: totalRevenue + amenitiesTotal,
+    totalRevenue,
     pendingPayments: pendingAmount,
     fullyPaid: fullyPaidCount,
   };
@@ -399,12 +402,18 @@ export async function getMonthlyRevenueForecast() {
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
     const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59).toISOString();
     
-    // Get total revenue (sum of all payments) for this month
+    // Get total revenue (sum of booking totals) for this month
     const revenueResult: Array<{ total: number | null }> = await db.select(
       `SELECT SUM(p.amount) as total 
        FROM payments p
        JOIN bookings b ON p.booking_id = b.id
-       WHERE b.start_date >= ? AND b.start_date <= ?`,
+       WHERE b.start_date >= ? AND b.start_date <= ? AND p.payment_type != 'refund'`,
+      [firstDay, lastDay]
+    );
+    const refundedResult: Array<{ total: number | null }> = await db.select(
+      `SELECT SUM(COALESCE(refunded_amount, 0)) as total
+       FROM bookings
+       WHERE start_date >= ? AND start_date <= ?`,
       [firstDay, lastDay]
     );
     const amenitiesRows: Array<{ extra_amenities: string | null }> = await db.select(
@@ -424,7 +433,7 @@ export async function getMonthlyRevenueForecast() {
     }, 0);
     
     const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-    const revenue = (revenueResult[0]?.total || 0) + amenitiesTotal;
+    const revenue = (revenueResult[0]?.total || 0) - (refundedResult[0]?.total || 0) + amenitiesTotal;
     
     monthsData.push({
       month: monthName,
@@ -447,6 +456,7 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
       b.end_date,
       b.total_amount,
       b.extra_amenities,
+      b.refunded_amount,
       b.status,
       b.created_at,
       c.name AS client_name,
@@ -471,12 +481,16 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
   
   for (const row of bookingsRaw) {
     // Get payments for this booking
-    const payments: Array<{ total: number | null }> = await db.select(
-      `SELECT SUM(amount) as total FROM payments WHERE booking_id = ?`,
+    const payments: Array<{ total: number | null; total_no_refund: number | null }> = await db.select(
+      `SELECT 
+         SUM(amount) as total,
+         SUM(CASE WHEN payment_type != 'refund' THEN amount ELSE 0 END) as total_no_refund
+       FROM payments WHERE booking_id = ?`,
       [row.booking_id]
     );
     
-    const totalPaid = payments[0]?.total || 0;
+    const totalPaid = payments[0]?.total_no_refund || 0;
+    const totalPaidNoRefund = payments[0]?.total_no_refund || 0;
     let amenitiesTotal = 0;
 
     if (row.extra_amenities) {
@@ -488,7 +502,9 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
       }
     }
     const totalAmountWithAmenities = row.total_amount + amenitiesTotal;
-    const remainingAmount = totalAmountWithAmenities - totalPaid;
+    const remainingAmount = row.status === "cancelled"
+      ? 0
+      : totalAmountWithAmenities - totalPaidNoRefund;
     
     results.push({
       bookingId: row.booking_id,
@@ -500,6 +516,7 @@ export async function getSalesReport(startDate?: string, endDate?: string) {
       endDate: row.end_date,
       totalAmount: totalAmountWithAmenities,
       totalPaid: totalPaid,
+      refundedAmount: row.refunded_amount || 0,
       amenitiesTotal: amenitiesTotal,
       remainingAmount: remainingAmount,
       status: row.status,
