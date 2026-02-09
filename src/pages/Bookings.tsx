@@ -77,15 +77,17 @@ function Bookings() {
         {/* filters */}
         <div className="rounded-xl border border-border p-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative">
+            <div>
               <label className="block text-sm font-medium text-foreground mb-2">Search</label>
-              <Search className="absolute left-3 top-[46px] h-4 w-4 text-muted-foreground" />
-              <input
-                placeholder="Search client name"
-                className="pl-10 input-elegant"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  placeholder="Search client name"
+                  className="pl-10 input-elegant"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Start Date</label>
