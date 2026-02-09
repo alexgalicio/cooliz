@@ -192,7 +192,11 @@ function SalesReport() {
   }
 
   const totalRevenue = reportData.reduce(
-    (sum, row) => sum + row.totalPaid + (row.amenitiesTotal || 0),
+    (sum, row) => sum + row.totalPaid - (row.refundedAmount || 0),
+    0
+  );
+  const totalRefunded = reportData.reduce(
+    (sum, row) => sum + (row.refundedAmount || 0),
     0
   );
   const totalPending = reportData.reduce((sum, row) => sum + row.remainingAmount, 0);
@@ -259,6 +263,10 @@ function SalesReport() {
           <div className="rounded-xl border border-border p-6">
             <p className="text-sm text-muted-foreground">Total Revenue</p>
             <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(totalRevenue)}</p>
+          </div>
+          <div className="rounded-xl border border-border p-6">
+            <p className="text-sm text-muted-foreground">Total Refunded</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(totalRefunded)}</p>
           </div>
           <div className="rounded-xl border border-border p-6">
             <p className="text-sm text-muted-foreground">Total Expenses</p>

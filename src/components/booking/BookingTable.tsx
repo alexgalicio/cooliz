@@ -27,6 +27,8 @@ export function BookingTable({ bookings }: BookingTableProps) {
             <th className="px-4 py-3 font-semibold text-foreground">Start Date</th>
             <th className="px-4 py-3 font-semibold text-foreground">End Date</th>
             <th className="px-4 py-3 font-semibold text-foreground">Time</th>
+            <th className="px-4 py-3 font-semibold text-foreground">Booking Cost</th>
+            <th className="px-4 py-3 font-semibold text-foreground">Add-ons</th>
             <th className="px-4 py-3 font-semibold text-foreground">Total</th>
             <th className="px-4 py-3 font-semibold text-foreground">Remaining</th>
             <th className="px-4 py-3 font-semibold text-foreground">Status</th>
@@ -35,6 +37,11 @@ export function BookingTable({ bookings }: BookingTableProps) {
         <tbody>
           {bookings.map((item) => {
             const status = getStatus(item);
+            const amenitiesTotal = (item.booking.extraAmenities || []).reduce(
+              (sum, amenity) => sum + amenity.total,
+              0
+            );
+            const totalWithAmenities = item.booking.totalAmount + amenitiesTotal;
             return (
               <tr
                 key={item.booking.id}
@@ -56,6 +63,12 @@ export function BookingTable({ bookings }: BookingTableProps) {
                 </td>
                 <td className="px-4 py-3 text-foreground">
                   {formatCurrency(item.booking.totalAmount)}
+                </td>
+                <td className="px-4 py-3 text-foreground">
+                  {formatCurrency(amenitiesTotal)}
+                </td>
+                <td className="px-4 py-3 text-foreground">
+                  {formatCurrency(totalWithAmenities)}
                 </td>
                 <td className="px-4 py-3 text-foreground">
                   {formatCurrency(item.remainingAmount)}

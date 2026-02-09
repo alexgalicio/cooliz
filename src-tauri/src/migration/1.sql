@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   end_date TEXT,
   total_amount REAL,
   extra_amenities TEXT,
+  refunded_amount REAL NOT NULL DEFAULT 0,
   status TEXT DEFAULT 'active', -- active | cancelled
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id)

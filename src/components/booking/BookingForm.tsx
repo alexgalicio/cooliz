@@ -148,8 +148,7 @@ function BookingForm() {
       return;
     }
 
-    const amenitiesTotal = amenitiesPayload.reduce((sum, item) => sum + item.total, 0);
-    const totalAmount = baseTotalAmount + amenitiesTotal;
+    const totalAmount = baseTotalAmount;
 
     let initialPayment = totalAmount;
     if (paymentOption === "partial") {

@@ -27,7 +27,7 @@ export interface Payment {
   id?: number;
   bookingId: number;
   amount: number;
-  paymentType: "full" | "partial";
+  paymentType: "full" | "partial" | "refund";
   created_at?: string;
 }
 
