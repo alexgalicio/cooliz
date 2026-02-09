@@ -19,6 +19,13 @@ export function AddPaymentModal({
   // if modal not open, dont show anything
   if (!open) return null; 
 
+  const amenitiesTotal = (item.booking.extraAmenities || []).reduce(
+    (sum, amenity) => sum + amenity.total,
+    0
+  );
+  const totalDue = item.booking.totalAmount + amenitiesTotal;
+  const paidAmount = totalDue - item.remainingAmount;
+
   async function handlePayRemaining() {
     // make sure booking has id
     if (!item.booking.id) return;
@@ -40,7 +47,12 @@ export function AddPaymentModal({
 
       const updatedPayments = [...item.payments, newPayment];
       const totalPaid = updatedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-      const newRemaining = Math.max(0, item.booking.totalAmount - totalPaid);
+      const amenitiesTotal = (item.booking.extraAmenities || []).reduce(
+        (sum, amenity) => sum + amenity.total,
+        0
+      );
+      const totalDue = item.booking.totalAmount + amenitiesTotal;
+      const newRemaining = Math.max(0, totalDue - totalPaid);
 
       // make new booking object with the payment 
       const updated: BookingDetails = {
@@ -91,13 +103,13 @@ export function AddPaymentModal({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total Amount:</span>
               <span className="font-medium text-foreground">
-                {formatCurrency(item.booking.totalAmount)}
+                {formatCurrency(totalDue)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Paid Amount:</span>
               <span className="font-medium text-foreground">
-                {formatCurrency(item.booking.totalAmount - item.remainingAmount)}
+                {formatCurrency(paidAmount)}
               </span>
             </div>
             <div className="flex justify-between pt-2 border-t border-border">
