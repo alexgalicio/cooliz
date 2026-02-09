@@ -416,24 +416,8 @@ export async function getMonthlyRevenueForecast() {
        WHERE start_date >= ? AND start_date <= ?`,
       [firstDay, lastDay]
     );
-    const amenitiesRows: Array<{ extra_amenities: string | null }> = await db.select(
-      `SELECT extra_amenities
-       FROM bookings
-       WHERE start_date >= ? AND start_date <= ? AND status != 'cancelled'`,
-      [firstDay, lastDay]
-    );
-    const amenitiesTotal = amenitiesRows.reduce((sum, row) => {
-      if (!row.extra_amenities) return sum;
-      try {
-        const amenities = JSON.parse(row.extra_amenities) as Array<{ total?: number }>;
-        return sum + amenities.reduce((amenitySum, item) => amenitySum + (item.total || 0), 0);
-      } catch {
-        return sum;
-      }
-    }, 0);
-    
     const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-    const revenue = (revenueResult[0]?.total || 0) - (refundedResult[0]?.total || 0) + amenitiesTotal;
+    const revenue = (revenueResult[0]?.total || 0) - (refundedResult[0]?.total || 0);
     
     monthsData.push({
       month: monthName,
