@@ -109,6 +109,11 @@ function BookingDetail() {
 
   // get status if paid/partial
   const status = getStatus(details);
+  const amenitiesTotal = (details.booking.extraAmenities || []).reduce(
+    (sum, amenity) => sum + amenity.total,
+    0
+  );
+  const totalDue = details.booking.totalAmount + amenitiesTotal;
 
   const updateAmenity = (id: string, field: keyof AmenityInput, value: string) => {
     setAmenities((prev) =>
@@ -212,15 +217,9 @@ function BookingDetail() {
 
     setAmenitiesSaving(true);
     try {
-      const previousAmenitiesTotal = (details.booking.extraAmenities || []).reduce(
-        (sum, item) => sum + item.total,
-        0
-      );
       const newAmenitiesTotal = payload.reduce((sum, item) => sum + item.total, 0);
-      const baseAmount = details.booking.totalAmount - previousAmenitiesTotal;
-      const newTotalAmount = baseAmount + newAmenitiesTotal;
       const totalPaid = details.payments.reduce((sum, payment) => sum + payment.amount, 0);
-      const newRemaining = newTotalAmount - totalPaid;
+      const newRemaining = details.booking.totalAmount + newAmenitiesTotal - totalPaid;
 
       await updateBookingExtraAmenities(details.booking.id, payload.length > 0 ? payload : []);
       const updated: BookingDetails = {
@@ -228,7 +227,7 @@ function BookingDetail() {
         booking: {
           ...details.booking,
           extraAmenities: payload.length > 0 ? payload : [],
-          totalAmount: newTotalAmount,
+          totalAmount: details.booking.totalAmount,
         },
         remainingAmount: newRemaining,
       };
@@ -325,7 +324,7 @@ function BookingDetail() {
               <div>
                 <h3 className="text-muted-foreground">Total</h3>
                 <p className="font-medium text-foreground">
-                  {formatCurrency(details.booking.totalAmount)}
+                  {formatCurrency(totalDue)}
                 </p>
               </div>
               <div>
