@@ -171,7 +171,7 @@ function SalesReport() {
       ];
 
       const csvContent = csvRows.join("\n");
-      
+
       // Use Tauri's dialog to save file
       const filePath = await save({
         defaultPath: `sales-report-${new Date().toISOString().split('T')[0]}.csv`,
@@ -219,7 +219,7 @@ function SalesReport() {
 
         {/* filters */}
         <div className="rounded-xl border border-border p-6 space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 items-end">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Start Month</label>
               <input
@@ -236,21 +236,30 @@ function SalesReport() {
                 onChange={(e) => handleMonthRangeChange(startMonth, e.target.value)}
               />
             </div>
-            <div className="flex items-end gap-2">
-              <button onClick={setThisMonth} className="btn-outline">
+            <div className="flex gap-2">
+              <button onClick={setThisMonth} className="btn-outline flex-1">
                 This Month
               </button>
-              <button onClick={setAllTime} className="btn-outline">
+              <button onClick={setAllTime} className="btn-outline flex-1">
                 All Time
               </button>
-              <button
-                onClick={exportToCSV}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export to CSV
-              </button>
             </div>
+          </div>
+        </div>
+
+        {/* export */}
+        <div className="rounded-xl border border-border p-6 space-y-4">
+          <div className="flex gap-2">
+            <select className="flex-1">
+              <option>Options</option>
+            </select>
+            <button
+              onClick={exportToCSV}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
           </div>
         </div>
 
@@ -329,13 +338,12 @@ function SalesReport() {
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`badge ${
-                                row.status === "cancelled"
-                                  ? "badge-cancelled"
-                                  : row.remainingAmount <= 0
+                              className={`badge ${row.status === "cancelled"
+                                ? "badge-cancelled"
+                                : row.remainingAmount <= 0
                                   ? "badge-paid"
                                   : "badge-partial"
-                              }`}
+                                }`}
                             >
                               {row.status === "cancelled" ? "cancelled" : row.remainingAmount <= 0 ? "paid" : "partial"}
                             </span>
