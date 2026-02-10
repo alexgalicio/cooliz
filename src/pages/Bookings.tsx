@@ -76,7 +76,7 @@ function Bookings() {
 
         {/* filters */}
         <div className="rounded-xl border border-border p-6 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Search</label>
               <div className="relative">
@@ -112,7 +112,7 @@ function Bookings() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-elegant"
+                className="input-elegant w-full"
               >
                 <option value="all">All Status</option>
                 <option value="partial">Partial</option>
