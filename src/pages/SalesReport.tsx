@@ -21,6 +21,7 @@ function SalesReport() {
   });
   const [expensesTotal, setExpensesTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [exportOption, setExportOption] = useState<"summary" | "revenue" | "expenses">("summary");
   const pageSize = 10;
 
   useEffect(() => {
@@ -162,13 +163,31 @@ function SalesReport() {
         ].join(",")),
       ];
 
-      const csvRows = [
-        ...summarySection,
-        "",
-        ...salesSection,
-        "",
-        ...expenseSection
-      ];
+      const csvRows = (() => {
+        if (exportOption === "revenue") {
+          return [
+            "Summary",
+            `Range,${rangeLabel}`,
+            `Total Revenue,${totalRevenue}`,
+          ];
+        }
+
+        if (exportOption === "expenses") {
+          return [
+            "Summary",
+            `Range,${rangeLabel}`,
+            `Total Expenses,${expensesTotal}`,
+          ];
+        }
+
+        return [
+          ...summarySection,
+          "",
+          ...salesSection,
+          "",
+          ...expenseSection,
+        ];
+      })();
 
       const csvContent = csvRows.join("\n");
 
@@ -250,8 +269,14 @@ function SalesReport() {
         {/* export */}
         <div className="rounded-xl border border-border p-6 space-y-4">
           <div className="flex gap-2">
-            <select className="flex-1">
-              <option>Options</option>
+            <select
+              className="flex-1"
+              value={exportOption}
+              onChange={(e) => setExportOption(e.target.value as "summary" | "revenue" | "expenses")}
+            >
+              <option value="summary">Overall Summary</option>
+              <option value="revenue">Total Revenue</option>
+              <option value="expenses">Total Expenses</option>
             </select>
             <button
               onClick={exportToCSV}
