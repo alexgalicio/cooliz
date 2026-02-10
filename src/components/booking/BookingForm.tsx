@@ -19,7 +19,7 @@ const amenityOptions = [
   'Kitchen Items',
   'Sound System',
   'Lighting',
-  'Canopy / Tent',
+  'Room',
   'Other',
 ];
 
