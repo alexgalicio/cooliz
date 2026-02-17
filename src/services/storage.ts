@@ -1,3 +1,17 @@
+// update expense
+export async function updateExpense(expense: Expense & { id: number }) {
+  const database = await getDb();
+  await database.execute(
+    `UPDATE expenses SET category = ?, description = ?, amount = ?, expense_date = ? WHERE id = ?`,
+    [
+      expense.category,
+      expense.description,
+      expense.amount,
+      expense.expenseDate,
+      expense.id,
+    ]
+  );
+}
 import Database from "@tauri-apps/plugin-sql";
 import { Booking, BookingDetails, Client, Payment } from "../types/booking";
 import { Expense } from "../types/expense";
@@ -21,17 +35,27 @@ export async function createClient(client: Client): Promise<number> {
   return result.lastInsertId!;
 }
 
+// update client
+export async function updateClient(client: Client & { id: number }) {
+  const database = await getDb();
+  await database.execute(
+    "UPDATE clients SET name = ?, phone = ?, email = ? WHERE id = ?",
+    [client.name, client.phone, client.email, client.id]
+  );
+}
+
 // create booking
 export async function createBooking(booking: Booking): Promise<number> {
   const database = await getDb();
   const extraAmenities = booking.extraAmenities ? JSON.stringify(booking.extraAmenities) : null;
   const result = await database.execute(
     `INSERT INTO bookings 
-      (client_id, event_type, start_date, end_date, total_amount, status, extra_amenities)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (client_id, event_type, number_of_person, start_date, end_date, total_amount, status, extra_amenities)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       booking.clientId,
       booking.eventType,
+      booking.numberOfPerson ?? null,
       booking.startDate,
       booking.endDate,
       booking.totalAmount,
@@ -40,6 +64,30 @@ export async function createBooking(booking: Booking): Promise<number> {
     ]
   );
   return result.lastInsertId!;
+}
+
+// update booking
+export async function updateBooking(
+  bookingId: number,
+  booking: Pick<Booking, "eventType" | "numberOfPerson" | "startDate" | "endDate" | "totalAmount" | "extraAmenities">
+) {
+  const database = await getDb();
+  const extraAmenities = booking.extraAmenities ? JSON.stringify(booking.extraAmenities) : null;
+
+  await database.execute(
+    `UPDATE bookings
+     SET event_type = ?, number_of_person = ?, start_date = ?, end_date = ?, total_amount = ?, extra_amenities = ?
+     WHERE id = ?`,
+    [
+      booking.eventType,
+      booking.numberOfPerson ?? null,
+      booking.startDate,
+      booking.endDate,
+      booking.totalAmount,
+      extraAmenities,
+      bookingId,
+    ]
+  );
 }
 
 // add payment
@@ -77,6 +125,7 @@ export async function getAllBookings() {
       b.id AS booking_id,
       b.client_id,
       b.event_type,
+      b.number_of_person,
       b.start_date,
       b.end_date,
       b.total_amount,
@@ -133,6 +182,7 @@ export async function getAllBookings() {
         id: row.booking_id,
         clientId: row.client_id,
         eventType: row.event_type,
+        numberOfPerson: row.number_of_person,
         startDate: row.start_date,
         endDate: row.end_date,
         totalAmount: row.total_amount,
@@ -161,6 +211,23 @@ export async function isBookingSlotAvailable(startDate: string, endDate: string)
      FROM bookings
      WHERE start_date < ? AND end_date > ? AND status != 'cancelled'`,
     [endDate, startDate]
+  );
+  const count = rows[0]?.count ?? 0;
+  return count === 0;
+}
+
+// check if a time range overlaps any existing booking except the current booking
+export async function isBookingSlotAvailableForUpdate(
+  startDate: string,
+  endDate: string,
+  bookingId: number
+): Promise<boolean> {
+  const db = await getDb();
+  const rows: Array<{ count: number }> = await db.select(
+    `SELECT COUNT(*) as count
+     FROM bookings
+     WHERE start_date < ? AND end_date > ? AND status != 'cancelled' AND id != ?`,
+    [endDate, startDate, bookingId]
   );
   const count = rows[0]?.count ?? 0;
   return count === 0;
