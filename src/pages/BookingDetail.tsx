@@ -3,7 +3,7 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { cancelBooking, updateBookingExtraAmenities } from "../services/storage";
 import { AddPaymentModal } from "../components/payment/AddPaymentModal";
 import { CancelConfirmationModal } from "../components/booking/CancelConfirmationModal";
-import { Ban, ArrowLeft, Plus } from "lucide-react";
+import { Ban, ArrowLeft, Plus, Pencil } from "lucide-react";
 import { useState } from "react";
 import { BookingDetails } from "../types/booking";
 import { formatCurrency, formatDate, getStatus } from "../utils/formatter";
@@ -253,15 +253,25 @@ function BookingDetail() {
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
-            <button
-              type="button"
-              onClick={() => setCancelModalOpen(true)}
-              disabled={details.booking.status === "cancelled"}
-              className="btn-destructive flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Ban className="h-4 w-4" />
-              {details.booking.status === "cancelled" ? "Event Cancelled" : "Cancel Event"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/newBooking", { state: details })}
+                className="btn-outline flex items-center gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit Booking
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelModalOpen(true)}
+                disabled={details.booking.status === "cancelled"}
+                className="btn-destructive flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Ban className="h-4 w-4" />
+                {details.booking.status === "cancelled" ? "Event Cancelled" : "Cancel Event"}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">{details.client.name}</h1>
@@ -311,6 +321,12 @@ function BookingDetail() {
                 <div>
                   <h3 className="text-muted-foreground">Type</h3>
                   <p className="font-medium text-foreground">{details.booking.eventType}</p>
+                </div>
+              )}
+              {details.booking.numberOfPerson != null && (
+                <div>
+                  <h3 className="text-muted-foreground">Persons</h3>
+                  <p className="font-medium text-foreground">{details.booking.numberOfPerson}</p>
                 </div>
               )}
               <div>
