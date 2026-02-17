@@ -191,7 +191,7 @@ export function BookingCalendar({ bookings }: BookingCalendarProps) {
                 bars.push(
                   <div
                     key={`${idx}-${week}`}
-                    className="absolute h-4 bg-orange-600 text-white px-2 py-0.5 rounded text-[10px] leading-tight truncate pointer-events-auto cursor-pointer flex items-center"
+                    className="absolute h-4 bg-orange-600 text-white px-2 py-0.5 rounded text-[10px] leading-tight truncate pointer-events-auto flex items-center"
                     style={{
                       left: `${(colStart / 7) * 100}%`,
                       width: `${(span / 7) * 100}%`,
