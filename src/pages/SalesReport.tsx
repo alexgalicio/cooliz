@@ -200,7 +200,7 @@ function SalesReport() {
 
       const ms = now.getMilliseconds();
 
-      // Use Tauri's dialog to save file
+      // use tauri dialog to save file
       const filePath = await save({
         defaultPath: `sales-report-${timestamp}-${ms}.csv`,
         filters: [{ name: 'CSV', extensions: ['csv'] }]
