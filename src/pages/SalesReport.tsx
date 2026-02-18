@@ -191,13 +191,19 @@ function SalesReport() {
 
       const csvContent = csvRows.join("\n");
 
+      const now = new Date();
+      const timestamp = now
+        .toISOString()
+        .replace('T', '_')
+        .replace(/\..+/, '')
+        .replace(/:/g, '-');
+
+      const ms = now.getMilliseconds();
+
       // Use Tauri's dialog to save file
       const filePath = await save({
-        defaultPath: `sales-report-${new Date().toISOString().split('T')[0]}.csv`,
-        filters: [{
-          name: 'CSV',
-          extensions: ['csv']
-        }]
+        defaultPath: `sales-report-${timestamp}-${ms}.csv`,
+        filters: [{ name: 'CSV', extensions: ['csv'] }]
       });
 
       if (filePath) {
