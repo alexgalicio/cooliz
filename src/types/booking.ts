@@ -16,6 +16,7 @@ export interface Booking {
   id?: number;
   clientId: number;
   eventType: string;
+  numberOfPerson?: number | null;
   startDate: string;
   endDate: string;
   totalAmount: number;

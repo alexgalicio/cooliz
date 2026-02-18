@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   client_id INTEGER NOT NULL,
   event_type TEXT,
+  number_of_person INTEGER,
   start_date TEXT,
   end_date TEXT,
   total_amount REAL,

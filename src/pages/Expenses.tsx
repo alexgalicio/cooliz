@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "../components/layout/MainLayout";
-import { addExpense, getAllExpenses } from "../services/storage";
+import { addExpense, getAllExpenses, updateExpense } from "../services/storage";
 import { formatCurrency, formatDate } from "../utils/formatter";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
@@ -38,6 +38,7 @@ function Expenses() {
     amount: "",
     expenseDate: "",
   });
+  const [editModal, setEditModal] = useState<{ open: boolean; expense: any | null }>({ open: false, expense: null });
 
   useEffect(() => {
     loadExpenses();
@@ -85,6 +86,41 @@ function Expenses() {
       await loadExpenses();
     } catch (err: any) {
       alert("Error: " + (err?.message ?? err?.toString() ?? "Failed to save expense"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleEditExpense(expense: any) {
+    setEditModal({ open: true, expense });
+  }
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editModal.expense) return;
+    const { id, category, description, amount, expense_date } = editModal.expense;
+    if (!category || !amount || !expense_date) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      alert("Amount must be a number greater than 0.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateExpense({
+        id,
+        category,
+        description,
+        amount: amt,
+        expenseDate: expense_date,
+      });
+      setEditModal({ open: false, expense: null });
+      await loadExpenses();
+    } catch (err: any) {
+      alert("Error: " + (err?.message ?? err?.toString() ?? "Failed to update expense"));
     } finally {
       setSaving(false);
     }
@@ -233,21 +269,27 @@ function Expenses() {
                       <th className="px-4 py-3 font-semibold text-foreground">Category</th>
                       <th className="px-4 py-3 font-semibold text-foreground">Description</th>
                       <th className="px-4 py-3 font-semibold text-foreground">Amount</th>
+                      <th className="px-4 py-3 font-semibold text-foreground">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginated.map((expense) => (
                       <tr
                         key={expense.id}
-                        className="border-b border-border last:border-b-0 bg-background hover:bg-muted/50 transition-colors"
+                        className="border-b border-border last:border-b-0 bg-background hover:bg-muted/50 transition-colors group"
                       >
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(expense.expense_date)}
-                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatDate(expense.expense_date)}</td>
                         <td className="px-4 py-3 text-foreground">{expense.category}</td>
                         <td className="px-4 py-3 text-muted-foreground">{expense.description || "-"}</td>
-                        <td className="px-4 py-3 text-foreground font-medium">
-                          {formatCurrency(expense.amount)}
+                        <td className="px-4 py-3 text-foreground font-medium">{formatCurrency(expense.amount)}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            className="btn-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 focus:ring-2 focus:ring-orange-400 focus:outline-none rounded px-3 py-1 transition"
+                            onClick={() => handleEditExpense(expense)}
+                          >
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -291,6 +333,65 @@ function Expenses() {
           </div>
         )}
       </div>
+      {/* Edit Expense Modal */}
+      {editModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-lg shadow-lg p-6 w-full max-w-md relative">
+            <button
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setEditModal({ open: false, expense: null })}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h3 className="text-lg font-semibold mb-4">Edit Expense</h3>
+            <form onSubmit={handleEditSave} className="grid gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Date <span className="required-field">*</span></label>
+                <input
+                  type="date"
+                  value={editModal.expense.expense_date}
+                  onChange={e => setEditModal(m => ({ ...m, expense: { ...m.expense, expense_date: e.target.value } }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Category <span className="required-field">*</span></label>
+                <select
+                  value={editModal.expense.category}
+                  onChange={e => setEditModal(m => ({ ...m, expense: { ...m.expense, category: e.target.value } }))}
+                >
+                  <option value="">Select category</option>
+                  {expenseCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editModal.expense.description || ""}
+                  onChange={e => setEditModal(m => ({ ...m, expense: { ...m.expense, description: e.target.value } }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount <span className="required-field">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editModal.expense.amount}
+                  onChange={e => setEditModal(m => ({ ...m, expense: { ...m.expense, amount: e.target.value } }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-2">
+                <button type="button" className="btn-outline" onClick={() => setEditModal({ open: false, expense: null })}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

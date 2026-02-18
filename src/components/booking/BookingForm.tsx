@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { addPayment, createBooking, createClient, isBookingSlotAvailable } from "../../services/storage";
+import {
+  addPayment,
+  createBooking,
+  createClient,
+  isBookingSlotAvailable,
+  isBookingSlotAvailableForUpdate,
+  updateBooking,
+  updateClient,
+} from "../../services/storage";
+import { BookingDetails } from "../../types/booking";
 
 const eventTypes = [
   'Reunion',
@@ -30,21 +39,42 @@ type AmenityInput = {
   quantity: string;
 };
 
-function BookingForm() {
+type BookingFormProps = {
+  initialBooking?: BookingDetails;
+};
+
+const buildAmenityInputs = (booking?: BookingDetails): AmenityInput[] => {
+  const amenities = booking?.booking.extraAmenities ?? [];
+
+  if (amenities.length === 0) {
+    return [{ id: crypto.randomUUID(), item: "", price: "", quantity: "" }];
+  }
+
+  return amenities.map((amenity) => ({
+    id: crypto.randomUUID(),
+    item: amenity.item,
+    price: amenity.price.toString(),
+    quantity: amenity.quantity.toString(),
+  }));
+};
+
+function BookingForm({ initialBooking }: BookingFormProps) {
   const navigate = useNavigate();
+  const isEditing = Boolean(initialBooking?.booking.id);
   const [paymentOption, setPaymentOption] = useState<"full" | "partial">("full");
-  const [extraAmenities, setExtraAmenities] = useState<AmenityInput[]>([
-    { id: crypto.randomUUID(), item: "", price: "", quantity: "" },
-  ]);
+  const [extraAmenities, setExtraAmenities] = useState<AmenityInput[]>(() =>
+    buildAmenityInputs(initialBooking)
+  );
 
   const [formData, setFormData] = useState({
-    clientName: "",
-    clientPhone: "",
-    clientEmail: "",
-    eventType: "",
-    startDateTime: "",
-    endDateTime: "",
-    totalAmount: "",
+    clientName: initialBooking?.client.name ?? "",
+    clientPhone: initialBooking?.client.phone ?? "",
+    clientEmail: initialBooking?.client.email ?? "",
+    eventType: initialBooking?.booking.eventType ?? "",
+    numberOfPerson: initialBooking?.booking.numberOfPerson?.toString() ?? "",
+    startDateTime: initialBooking?.booking.startDate ?? "",
+    endDateTime: initialBooking?.booking.endDate ?? "",
+    totalAmount: initialBooking?.booking.totalAmount?.toString() ?? "",
     initialPayment: "",
   });
 
@@ -139,6 +169,16 @@ function BookingForm() {
       return;
     }
 
+    let numberOfPerson: number | null = null;
+    if (formData.numberOfPerson.trim()) {
+      const parsed = Number(formData.numberOfPerson);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        alert("Number of persons must be a whole number greater than 0.");
+        return;
+      }
+      numberOfPerson = parsed;
+    }
+
     let amenitiesPayload: Array<{ item: string; price: number; quantity: number; total: number }> = [];
 
     try {
@@ -179,14 +219,65 @@ function BookingForm() {
       return;
     }
 
-    // check for overlapping bookings
-    const slotAvailable = await isBookingSlotAvailable(formData.startDateTime, formData.endDateTime);
-    if (!slotAvailable) {
-      alert("This date and time range is already booked. Please choose another schedule.");
-      return;
-    }
-
     try {
+      if (isEditing) {
+        if (!initialBooking?.client.id || !initialBooking.booking.id) {
+          alert("Missing booking details for editing.");
+          return;
+        }
+
+        const slotAvailable = await isBookingSlotAvailableForUpdate(
+          formData.startDateTime,
+          formData.endDateTime,
+          initialBooking.booking.id
+        );
+
+        if (!slotAvailable) {
+          alert("This date and time range is already booked. Please choose another schedule.");
+          return;
+        }
+
+        const totalPaid = initialBooking.payments.reduce(
+          (sum, payment) =>
+            payment.paymentType === "refund" ? sum : sum + payment.amount,
+          0
+        );
+
+        if (totalAmount < totalPaid) {
+          alert("Total amount cannot be less than the amount already paid.");
+          return;
+        }
+
+        await updateClient({
+          id: initialBooking.client.id,
+          name: formData.clientName,
+          phone: formData.clientPhone,
+          email: formData.clientEmail,
+        });
+
+        await updateBooking(initialBooking.booking.id, {
+          eventType: formData.eventType,
+          numberOfPerson,
+          startDate: formData.startDateTime,
+          endDate: formData.endDateTime,
+          totalAmount,
+          extraAmenities: amenitiesPayload,
+        });
+
+        navigate("/bookings");
+        return;
+      }
+
+      // check for overlapping bookings
+      const slotAvailable = await isBookingSlotAvailable(
+        formData.startDateTime,
+        formData.endDateTime
+      );
+      if (!slotAvailable) {
+        alert("This date and time range is already booked. Please choose another schedule.");
+        return;
+      }
+
       // create client
       const clientId = await createClient({
         name: formData.clientName,
@@ -198,6 +289,7 @@ function BookingForm() {
       const bookingId = await createBooking({
         clientId,
         eventType: formData.eventType,
+        numberOfPerson,
         startDate: formData.startDateTime,
         endDate: formData.endDateTime,
         totalAmount,
@@ -257,7 +349,7 @@ function BookingForm() {
       <div className="rounded-xl border border-border p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Event Details</h3>
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2">
             <h4>Event Type</h4>
             <select
               value={formData.eventType}
@@ -270,6 +362,19 @@ function BookingForm() {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
+          </div>
+          <div className="space-y-2">
+            <h4>Number of Persons</h4>
+            <input
+              value={formData.numberOfPerson}
+              onChange={(e) =>
+                setFormData({ ...formData, numberOfPerson: e.target.value })
+              }
+              type="number"
+              min="1"
+              step="1"
+              placeholder="0"
+            />
           </div>
           <div className="space-y-2">
             <h4>Start Date & Time <span className="required-field">*</span></h4>
@@ -295,6 +400,11 @@ function BookingForm() {
       {/* payment details */}
       <div className="rounded-xl border border-border p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Payment Details</h3>
+        {isEditing && (
+          <p className="text-xs text-muted-foreground mb-4">
+            Payments are managed in the booking details page.
+          </p>
+        )}
         <div className="space-y-4">
           <div className="space-y-2">
             <h4>Total Amount <span className="required-field">*</span></h4>
@@ -305,38 +415,42 @@ function BookingForm() {
               }
               type="text" placeholder="0.00" />
           </div>
-          <div className="space-y-2">
-            <h4>Payment Option</h4>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className={`${paymentOption === "full" ? "btn-primary" : "btn-outline"} w-full`}
-                onClick={() => setPaymentOption("full")}
-              >
-                Pay Full
-              </button>
+          {!isEditing && (
+            <>
+              <div className="space-y-2">
+                <h4>Payment Option</h4>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className={`${paymentOption === "full" ? "btn-primary" : "btn-outline"} w-full`}
+                    onClick={() => setPaymentOption("full")}
+                  >
+                    Pay Full
+                  </button>
 
-              <button
-                type="button"
-                className={`${paymentOption === "partial" ? "btn-primary" : "btn-outline"} w-full`}
-                onClick={() => setPaymentOption("partial")}
-              >
-                Pay Partial
-              </button>
-            </div>
-          </div>
+                  <button
+                    type="button"
+                    className={`${paymentOption === "partial" ? "btn-primary" : "btn-outline"} w-full`}
+                    onClick={() => setPaymentOption("partial")}
+                  >
+                    Pay Partial
+                  </button>
+                </div>
+              </div>
 
-          {paymentOption === "partial" && (
-            <div className="space-y-2">
-              <h4>Initial Payment <span className="required-field">*</span></h4>
-              <input
-                type="text"
-                value={formData.initialPayment}
-                onChange={(e) =>
-                  setFormData({ ...formData, initialPayment: e.target.value })
-                }
-                placeholder="0.00" />
-            </div>
+              {paymentOption === "partial" && (
+                <div className="space-y-2">
+                  <h4>Initial Payment <span className="required-field">*</span></h4>
+                  <input
+                    type="text"
+                    value={formData.initialPayment}
+                    onChange={(e) =>
+                      setFormData({ ...formData, initialPayment: e.target.value })
+                    }
+                    placeholder="0.00" />
+                </div>
+              )}
+            </>
           )}
 
         </div>
@@ -438,7 +552,7 @@ function BookingForm() {
           Cancel
         </button>
         <button className="btn-primary" type="submit">
-          Create Booking
+          {isEditing ? "Update Booking" : "Create Booking"}
         </button>
       </div>
     </form>
