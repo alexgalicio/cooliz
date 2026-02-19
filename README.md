@@ -14,6 +14,7 @@ A desktop app for managing bookings at [Cooliz](https://www.facebook.com/resort.
 - **New booking** — Create a new booking
 - **Payments** — View and manage payments
 - **Sales report** — Revenue and payment reports
+- **Expenses** — Track and manage expenses
 
 ## Screenshots
 ![Dashboard](public/screenshots/dashboard.png)
@@ -25,6 +26,8 @@ A desktop app for managing bookings at [Cooliz](https://www.facebook.com/resort.
 ![Payments](public/screenshots/payments.png)
 
 ![Sales Report](public/screenshots/salesReport.png)
+
+![Expenses](public/screenshots/expenses.png)
 
 ## Download
 
